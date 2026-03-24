@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from utils.logger import log_info, log_error, log_debug
 from utils.exceptions import ExchangeError, InsufficientBalanceError, FuturesError
 from utils.helpers import calculate_average, extract_base_asset
+from services.rate_limiter import get_rate_limiter
 
 # Tải biến môi trường
 load_dotenv()
@@ -24,6 +25,7 @@ class ExchangeService:
         """Khởi tạo dịch vụ sàn giao dịch."""
         self.exchanges = {}
         self.exchange_instances = {}
+        self._rate_limiter = get_rate_limiter()
         self._initialize_exchanges()
     
     def _initialize_exchanges(self):
@@ -591,6 +593,7 @@ class ExchangeService:
             dict: Thông tin lệnh đã tạo
         """
         try:
+            await self._rate_limiter.async_acquire(exchange_id)
             pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
             return await pro_exchange.create_limit_buy_order(symbol, amount, price)
         except Exception as e:
@@ -610,6 +613,7 @@ class ExchangeService:
             dict: Thông tin lệnh đã tạo
         """
         try:
+            await self._rate_limiter.async_acquire(exchange_id)
             pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
             return await pro_exchange.create_limit_sell_order(symbol, amount, price)
         except Exception as e:
@@ -667,6 +671,7 @@ class ExchangeService:
             list: Danh sách các lệnh đang mở
         """
         try:
+            await self._rate_limiter.async_acquire(exchange_id)
             pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
             return await pro_exchange.fetch_open_orders(symbol)
         except Exception as e:
@@ -684,6 +689,7 @@ class ExchangeService:
             list: Danh sách các lệnh đã đóng
         """
         try:
+            await self._rate_limiter.async_acquire(exchange_id)
             pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
             return await pro_exchange.fetch_closed_orders(symbol)
         except Exception as e:
