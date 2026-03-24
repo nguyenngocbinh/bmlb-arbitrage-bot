@@ -11,7 +11,7 @@ from utils.logger import log_info, log_error, log_warning, log_debug
 from utils.exceptions import ArbitrageError, ExchangeError, InsufficientBalanceError, OrderError
 from utils.helpers import calculate_average
 from bots.base_bot import BaseBot
-from configs import EXCHANGE_FEES
+from configs import EXCHANGE_FEES, RISK_CONFIG
 
 
 class ClassicBot(BaseBot):
@@ -19,7 +19,7 @@ class ClassicBot(BaseBot):
     Bot giao dịch chênh lệch giá cổ điển, mua ở sàn giá thấp và bán ở sàn giá cao.
     """
     
-    def __init__(self, exchange_service, balance_service, order_service, notification_service, db_service=None):
+    def __init__(self, exchange_service, balance_service, order_service, notification_service, db_service=None, risk_config=None):
         """
         Khởi tạo bot giao dịch chênh lệch giá cổ điển.
         
@@ -29,6 +29,7 @@ class ClassicBot(BaseBot):
             order_service (OrderService): Dịch vụ quản lý lệnh
             notification_service (NotificationService): Dịch vụ thông báo
             db_service (DatabaseService, optional): Dịch vụ cơ sở dữ liệu
+            risk_config (dict, optional): Cấu hình quản lý rủi ro
         """
         super().__init__(
             exchange_service, 
@@ -36,7 +37,8 @@ class ClassicBot(BaseBot):
             order_service, 
             notification_service,
             {'fees': EXCHANGE_FEES},
-            db_service
+            db_service,
+            risk_config or RISK_CONFIG
         )
         
         # Thêm biến theo dõi số lần thử lại và thống kê
@@ -353,6 +355,21 @@ class ClassicBot(BaseBot):
             # Cập nhật slippage
             if trade_success:
                 self._process_slippage(trade_id, fill_result, min_ask_ex, max_bid_ex)
+            
+            # Kiểm tra rủi ro sau giao dịch
+            slippage_usd = fill_result.get('total_slippage_usd', 0) if isinstance(fill_result, dict) else 0
+            should_continue, risk_reason = self.risk_manager.check_post_trade(
+                profit_with_fees_usd, profit_with_fees_pct,
+                slippage_usd=slippage_usd,
+                total_profit_pct=self.total_absolute_profit_pct,
+                current_time=time.time()
+            )
+            if not should_continue:
+                log_warning(f"Risk manager yêu cầu dừng: {risk_reason}")
+                if self.notification_service:
+                    self.notification_service.send_message(
+                        f"⚠️ RISK MANAGER - DỪNG BOT: {risk_reason}"
+                    )
             
             # Cập nhật thống kê
             if trade_success:

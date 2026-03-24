@@ -49,3 +49,14 @@ SYMBOL_FILE = 'symbol.txt'
 
 # Database
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'arbitrage.db')
+
+# Risk Management
+RISK_CONFIG = {
+    'enabled': True,
+    'max_drawdown_pct': 5.0,           # Drawdown tối đa: 5%
+    'max_loss_per_trade_usd': 10.0,    # Lỗ tối đa mỗi giao dịch: 10 USD
+    'max_session_loss_pct': 3.0,       # Lỗ tối đa trong phiên: 3%
+    'max_consecutive_losses': 5,        # Lỗ liên tiếp tối đa: 5 lần
+    'max_slippage_pct': 0.5,           # Slippage tối đa cho phép: 0.5%
+    'cooldown_after_loss_sec': 30,     # Cooldown sau lỗ lớn: 30 giây
+}

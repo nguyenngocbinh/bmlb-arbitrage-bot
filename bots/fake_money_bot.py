@@ -10,7 +10,7 @@ from utils.logger import log_info, log_error, log_warning
 from utils.exceptions import ArbitrageError
 from utils.helpers import calculate_average
 from bots.base_bot import BaseBot
-from configs import EXCHANGE_FEES
+from configs import EXCHANGE_FEES, RISK_CONFIG
 
 
 class FakeMoneyBot(BaseBot):
@@ -18,7 +18,7 @@ class FakeMoneyBot(BaseBot):
     Bot mô phỏng giao dịch với tiền ảo, không thực hiện giao dịch thực tế.
     """
     
-    def __init__(self, exchange_service, balance_service, order_service, notification_service, db_service=None):
+    def __init__(self, exchange_service, balance_service, order_service, notification_service, db_service=None, risk_config=None):
         """
         Khởi tạo bot mô phỏng.
         
@@ -28,6 +28,7 @@ class FakeMoneyBot(BaseBot):
             order_service (OrderService): Dịch vụ quản lý lệnh
             notification_service (NotificationService): Dịch vụ thông báo
             db_service (DatabaseService, optional): Dịch vụ cơ sở dữ liệu
+            risk_config (dict, optional): Cấu hình quản lý rủi ro
         """
         super().__init__(
             exchange_service, 
@@ -35,7 +36,8 @@ class FakeMoneyBot(BaseBot):
             order_service, 
             notification_service,
             {'fees': EXCHANGE_FEES},
-            db_service
+            db_service,
+            risk_config or RISK_CONFIG
         )
     
     async def start(self):

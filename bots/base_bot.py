@@ -15,6 +15,7 @@ from utils.helpers import show_time, extract_base_asset
 from configs import PROFIT_CRITERIA_PCT, PROFIT_CRITERIA_USD, ENABLE_CTRL_C_HANDLING
 from services.database_service import DatabaseService
 from services.async_order_service import AsyncOrderService
+from services.risk_manager import RiskManager
 
 
 class BaseBot:
@@ -22,7 +23,7 @@ class BaseBot:
     Lớp bot giao dịch cơ sở với các chức năng chung.
     """
     
-    def __init__(self, exchange_service, balance_service, order_service, notification_service, config=None, db_service=None):
+    def __init__(self, exchange_service, balance_service, order_service, notification_service, config=None, db_service=None, risk_config=None):
         """
         Khởi tạo bot giao dịch.
         
@@ -33,6 +34,7 @@ class BaseBot:
             notification_service (NotificationService): Dịch vụ thông báo
             config (dict, optional): Cấu hình cho bot
             db_service (DatabaseService, optional): Dịch vụ cơ sở dữ liệu
+            risk_config (dict, optional): Cấu hình quản lý rủi ro
         """
         self.exchange_service = exchange_service
         self.balance_service = balance_service
@@ -41,6 +43,7 @@ class BaseBot:
         self.notification_service = notification_service
         self.config = config or {}
         self.db = db_service or DatabaseService()
+        self.risk_manager = RiskManager(risk_config)
         self.session_id = None
         self.total_fees_usd = 0
         self.total_slippage_usd = 0
@@ -400,6 +403,14 @@ class BaseBot:
         if self.crypto[max_bid_ex] < self.crypto_per_transaction * 1.001:
             return False
         
+        # Kiểm tra risk management
+        allowed, reason = self.risk_manager.check_pre_trade(
+            profit_with_fees_usd, current_time=time.time()
+        )
+        if not allowed:
+            log_warning(f"Risk manager chặn giao dịch: {reason}")
+            return False
+        
         # Nếu qua tất cả các điều kiện, có thể thực hiện giao dịch
         return True
     
@@ -463,6 +474,21 @@ class BaseBot:
 
             # Cập nhật slippage vào database và log
             self._process_slippage(trade_id, fill_result, min_ask_ex, max_bid_ex)
+            
+            # Kiểm tra rủi ro sau giao dịch
+            slippage_usd = fill_result.get('total_slippage_usd', 0) if isinstance(fill_result, dict) else 0
+            should_continue, risk_reason = self.risk_manager.check_post_trade(
+                profit_with_fees_usd, profit_with_fees_pct,
+                slippage_usd=slippage_usd,
+                total_profit_pct=self.total_absolute_profit_pct,
+                current_time=time.time()
+            )
+            if not should_continue:
+                log_warning(f"Risk manager yêu cầu dừng: {risk_reason}")
+                if self.notification_service:
+                    self.notification_service.send_message(
+                        f"⚠️ RISK MANAGER - DỪNG BOT: {risk_reason}"
+                    )
             
             # Cập nhật giá trước đó
             self.prec_ask_price = self.min_ask_price

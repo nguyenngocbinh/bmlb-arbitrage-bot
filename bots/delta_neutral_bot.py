@@ -11,7 +11,7 @@ from utils.logger import log_info, log_error, log_warning, log_debug
 from utils.exceptions import ArbitrageError, ExchangeError, InsufficientBalanceError, OrderError
 from utils.helpers import calculate_average, extract_base_asset
 from bots.base_bot import BaseBot
-from configs import EXCHANGE_FEES
+from configs import EXCHANGE_FEES, RISK_CONFIG
 
 
 class DeltaNeutralBot(BaseBot):
@@ -20,7 +20,7 @@ class DeltaNeutralBot(BaseBot):
     Mua vào tiền điện tử trên các sàn spot và mở vị thế short trên futures.
     """
     
-    def __init__(self, exchange_service, balance_service, order_service, notification_service, db_service=None):
+    def __init__(self, exchange_service, balance_service, order_service, notification_service, db_service=None, risk_config=None):
         """
         Khởi tạo bot giao dịch delta-neutral.
         
@@ -30,6 +30,7 @@ class DeltaNeutralBot(BaseBot):
             order_service (OrderService): Dịch vụ quản lý lệnh
             notification_service (NotificationService): Dịch vụ thông báo
             db_service (DatabaseService, optional): Dịch vụ cơ sở dữ liệu
+            risk_config (dict, optional): Cấu hình quản lý rủi ro
         """
         super().__init__(
             exchange_service,
@@ -37,7 +38,8 @@ class DeltaNeutralBot(BaseBot):
             order_service,
             notification_service,
             {'fees': EXCHANGE_FEES},
-            db_service
+            db_service,
+            risk_config or RISK_CONFIG
         )
         
         # Biến cho chiến lược delta-neutral
