@@ -1,151 +1,204 @@
-
 # Crypto Arbitrage Bot
 
-## 📜 Giới thiệu
-Crypto Arbitrage Bot là một bot sử dụng chiến lược arbitrage để phát hiện các cơ hội chênh lệch giá giữa các sàn giao dịch crypto và gửi cảnh báo qua Telegram khi có cơ hội lớn.
+Bot giao dịch chênh lệch giá crypto tự động giữa nhiều sàn. Hỗ trợ Binance, KuCoin, OKX, Bybit.
 
-## 🔧 Cấu trúc thư mục
+## Tính năng
+
+- **3 chế độ bot**: Classic arbitrage, Delta-neutral hedging, Fake money (mô phỏng)
+- **Realtime orderbook**: WebSocket qua ccxt.pro, phát hiện cơ hội tức thì
+- **Đặt lệnh song song**: Mua/bán đồng thời trên nhiều sàn (async orders)
+- **Multi-pair**: Giao dịch nhiều cặp tiền cùng lúc
+- **Risk management**: Max drawdown, lỗ liên tiếp, cooldown, circuit breaker
+- **Rate limiting**: Token bucket per exchange, tránh bị ban API
+- **Slippage tracking**: So sánh giá kỳ vọng vs giá thực tế
+- **Database**: SQLite lưu lịch sử sessions, trades, opportunities
+- **Web dashboard**: FastAPI + Jinja2 theo dõi giao dịch qua trình duyệt
+- **Backtesting**: Replay dữ liệu lịch sử, parameter sweep, phân tích metrics
+- **Telegram alerts**: Thông báo cơ hội, giao dịch, lỗi qua Telegram
+
+## Cấu trúc dự án
 
 ```
-
 aws-arbitrage-bot/
+├── main.py                 # Entry point
+├── configs.py              # Cấu hình: exchanges, fees, risk, paths
+├── requirements.txt        # Dependencies
 │
-├── .env                    # Biến môi trường: API keys, chat ID
-├── configs.py              # Cấu hình chung: đường dẫn, pairs, sàn
-├── main.py                 # Điểm chạy chính (entry point)
-├── requirements.txt        # Danh sách thư viện cần cài
+├── bots/                   # Bot implementations
+│   ├── base_bot.py         #   Lớp cơ sở (orderbook loop, session management)
+│   ├── classic_bot.py      #   Mua sàn giá thấp → bán sàn giá cao
+│   ├── delta_neutral_bot.py#   Spot arbitrage + short futures hedge
+│   ├── fake_money_bot.py   #   Mô phỏng, không đặt lệnh thật
+│   └── demo_fake_bot.py    #   Demo standalone (không cần API key)
 │
-├── bots/
-│   ├── __init__.py
-│   ├── base_bot.py        # Bot base class với các hàm chung
-│   ├── classic_bot.py     # Bot giao dịch classic arbitrage
-│   ├── delta_neutral_bot.py # Bot giao dịch delta neutral
-│   └── fake_money_bot.py  # Bot test với tiền ảo
+├── services/               # Business logic
+│   ├── exchange_service.py #   Kết nối sàn (ccxt/ccxt.pro)
+│   ├── balance_service.py  #   Quản lý số dư
+│   ├── order_service.py    #   Đặt lệnh đồng bộ
+│   ├── async_order_service.py# Đặt lệnh bất đồng bộ (song song)
+│   ├── database_service.py #   SQLite persistence
+│   ├── notification_service.py# Telegram alerts
+│   ├── risk_manager.py     #   Stop-loss & risk management
+│   ├── rate_limiter.py     #   Token bucket rate limiting
+│   └── multi_pair_manager.py#  Giao dịch đa cặp đồng thời
 │
-├── services/
-│   ├── __init__.py
-│   ├── balance_service.py  # Quản lý số dư tài khoản
-│   ├── exchange_service.py # Tương tác với sàn giao dịch
-│   ├── notification_service.py # Gửi thông báo
-│   └── order_service.py    # Quản lý lệnh giao dịch
+├── backtest/               # Backtesting framework
+│   ├── data_recorder.py    #   Ghi orderbook vào SQLite
+│   ├── engine.py           #   Replay engine + parameter sweep
+│   └── analyzer.py         #   Phân tích: win rate, Sharpe, drawdown
 │
-└── utils/
-    ├── __init__.py
-    ├── env_loader.py      # Load biến môi trường
-    ├── exceptions.py      # Custom exceptions
-    ├── helpers.py         # Các hàm tiện ích
-    └── logger.py          # Logging configuration
+├── web/                    # Web dashboard
+│   ├── app.py              #   FastAPI app (REST API + HTML)
+│   └── templates/          #   Jinja2 templates
+│
+├── utils/                  # Tiện ích
+│   ├── exceptions.py       #   Custom exceptions
+│   ├── helpers.py          #   Hàm tiện ích
+│   ├── logger.py           #   Logging có màu + file
+│   └── env_loader.py       #   Load .env
+│
+├── tests/                  # 12 test files, 221+ tests
+├── data/                   # SQLite database (auto-created)
+└── logs/                   # Log files (auto-created)
+```
 
-````
-
-## 🚀 Cài đặt
-
-### Bước 1: Clone repository
-
-Clone project về máy:
+## Cài đặt
 
 ```bash
 git clone https://github.com/nguyenngocbinh/aws-arbitrage-bot.git
 cd aws-arbitrage-bot
-````
-
-### Bước 2: Cài đặt các thư viện
-
-Cài đặt các thư viện cần thiết:
-
-```bash
 pip install -r requirements.txt
 ```
 
-### Bước 3: Cấu hình
+## Cấu hình
 
-Tạo một file `.env` trong thư mục gốc và thêm các giá trị sau:
+Tạo file `.env` trong thư mục gốc:
 
 ```env
-TELEGRAM_TOKEN =your_bot_token
+# Exchange API keys (cần cho classic/delta-neutral mode)
+BINANCE_API_KEY=your_key
+BINANCE_SECRET=your_secret
+
+KUCOIN_API_KEY=your_key
+KUCOIN_SECRET=your_secret
+KUCOIN_PASSWORD=your_password
+
+OKX_API_KEY=your_key
+OKX_SECRET=your_secret
+OKX_PASSWORD=your_password
+
+BYBIT_API_KEY=your_key
+BYBIT_SECRET=your_secret
+
+# Telegram (tùy chọn)
+TELEGRAM_TOKEN=your_bot_token
 CHAT_ID=your_chat_id
 ```
 
-* **`TELEGRAM_TOKEN`**: Token của bot Telegram.
-* **`CHAT_ID`**: ID chat của bạn hoặc group chat để nhận thông báo.
+## Sử dụng
 
-### Bước 4: Chạy bot
-
-Chạy bot với lệnh sau:
+### Demo nhanh (không cần API key)
 
 ```bash
+# Dữ liệu thực từ sàn, tiền giả
+python -m bots.demo_fake_bot --symbol BTC/USDT --exchanges binance okx bybit --duration 5
+```
+
+### Chạy bot đầy đủ
+
+```bash
+# Fake money — mô phỏng với dữ liệu thực
+python main.py fake-money 15 1000 binance kucoin okx BTC/USDT
+
+# Classic arbitrage — giao dịch thật (cần API keys)
 python main.py classic 15 1000 binance kucoin okx BTC/USDT
+
+# Delta-neutral — spot + futures hedge
+python main.py delta-neutral 15 1000 binance kucoin okx BTC/USDT
+
+# Multi-pair
+python main.py fake-money 15 1000 binance kucoin okx --symbols BTC/USDT ETH/USDT SOL/USDT
 ```
 
-Hoặc nếu muốn test với tiền ảo:
+**Tham số**:
+| Tham số | Mô tả |
+|---------|--------|
+| `mode` | `fake-money`, `classic`, `delta-neutral` |
+| `renew_time` | Thời gian mỗi phiên (phút) |
+| `usdt_amount` | Vốn USDT |
+| `exchange1-3` | 3 sàn giao dịch |
+| `symbol` | Cặp tiền (tùy chọn, tự tìm nếu bỏ trống) |
+| `--symbols` | Nhiều cặp tiền cho multi-pair mode |
+| `--debug` | Bật debug logging |
+| `--dry-run` | Chạy không đặt lệnh thật |
+
+### Web Dashboard
 
 ```bash
-python main.py fake-money 15 1000 binance kucoin okx
+uvicorn web.app:app --reload --port 8000
+# Truy cập: http://localhost:8000
+# API docs: http://localhost:8000/docs
 ```
 
-Các đối số:
-1. mode: Chế độ bot (fake-money/classic/delta-neutral)
-2. renew_time: Thời gian làm mới (phút)
-3. usdt_amount: Số lượng USDT để giao dịch
-4. exchange1: Sàn giao dịch thứ nhất
-5. exchange2: Sàn giao dịch thứ hai
-6. exchange3: Sàn giao dịch thứ ba
-7. symbol: (tùy chọn) Cặp tiền giao dịch (VD: BTC/USDT)
+### Backtesting
+
+```python
+from backtest.data_recorder import DataRecorder
+from backtest.engine import BacktestEngine
+from backtest.analyzer import BacktestAnalyzer
+
+recorder = DataRecorder(db_path=':memory:')
+recorder.generate_sample_data('BTC/USDT', ['binance', 'kucoin'], 500, 50000.0, (100, 300))
+
+engine = BacktestEngine(data_source=recorder, initial_balance=10000.0, fee_rate=0.001)
+result = engine.run(symbol='BTC/USDT', exchanges=['binance', 'kucoin'])
+
+analyzer = BacktestAnalyzer()
+analyzer.add_result('test', result)
+print(analyzer.generate_report('test'))
 ```
 
-## 📈 Tính năng
+## Testing
 
-1. **Ba chế độ giao dịch**:
-   - **Classic**: Giao dịch arbitrage truyền thống giữa các sàn
-   - **Delta Neutral**: Giao dịch với chiến lược cân bằng delta
-   - **Fake Money**: Chế độ test với tiền ảo để kiểm thử chiến lược
+```bash
+# Tất cả tests (221+ tests)
+pytest tests/ -v
 
-2. **Quản lý giao dịch thông minh**:
-   - Tự động kiểm tra chênh lệch giá giữa các sàn
-   - Đặt lệnh với precision phù hợp cho từng sàn
-   - Theo dõi trạng thái lệnh và số dư theo thời gian thực
+# Một module cụ thể
+pytest tests/test_backtest.py -v
+pytest tests/test_risk_manager.py -v
 
-3. **Tính năng an toàn**:
-   - Kiểm tra số dư trước khi giao dịch
-   - Hủy lệnh tự động nếu không khớp sau thời gian chờ
-   - Cơ chế retry cho các API calls thất bại
+# Dừng khi gặp lỗi
+pytest tests/ -v -x
+```
 
-4. **Thông báo và theo dõi**:
-   - Gửi cảnh báo qua Telegram khi có cơ hội giao dịch
-   - Log đầy đủ thông tin để debug và phân tích
+## Sàn hỗ trợ
 
-## 🔧 Cấu trúc mã nguồn
+| Sàn | Spot | Futures | Phí mặc định |
+|-----|------|---------|-------------|
+| Binance | ✅ | — | 0.1% / 0.1% |
+| KuCoin | ✅ | ✅ | 0.1% / 0.1% |
+| OKX | ✅ | — | 0.08% / 0.1% |
+| Bybit | ✅ | — | 0.1% / 0.1% |
 
-### **`bots/`**:
+## Risk Management
 
-* `base_bot.py`: Bot base class với các phương thức chung
-* `classic_bot.py`: Triển khai bot giao dịch arbitrage truyền thống
-* `delta_neutral_bot.py`: Bot giao dịch với chiến lược delta neutral
-* `fake_money_bot.py`: Bot test với tiền ảo để kiểm thử chiến lược
+Cấu hình trong `configs.py` → `RISK_CONFIG`:
 
-### **`services/`**:
+| Tham số | Mặc định | Mô tả |
+|---------|----------|--------|
+| `max_drawdown_pct` | 5% | Drawdown tối đa trước khi dừng |
+| `max_loss_per_trade_usd` | $10 | Lỗ tối đa mỗi giao dịch |
+| `max_session_loss_pct` | 3% | Lỗ tối đa trong phiên |
+| `max_consecutive_losses` | 5 | Lỗ liên tiếp tối đa |
+| `max_slippage_pct` | 0.5% | Slippage cho phép |
+| `cooldown_after_loss_sec` | 30s | Cooldown sau lỗ lớn |
 
-* `balance_service.py`: Quản lý số dư tài khoản trên các sàn
-* `exchange_service.py`: Tương tác với API của các sàn giao dịch
-* `notification_service.py`: Gửi thông báo qua Telegram
-* `order_service.py`: Quản lý việc đặt và theo dõi lệnh
+## License
 
-### **`utils/`**:
+MIT License — tự do sử dụng và chỉnh sửa.
 
-* `env_loader.py`: Load và validate các biến môi trường
-* `exceptions.py`: Custom exceptions cho các tình huống lỗi
-* `helpers.py`: Các hàm tiện ích dùng chung
-* `logger.py`: Cấu hình logging cho toàn bộ ứng dụng
+## Liên hệ
 
-## ⚙️ Cấu hình và mở rộng
-
-* **Thêm sàn giao dịch**: Bạn có thể dễ dàng thêm các sàn giao dịch mới trong file `src/exchanges.py` và cấu hình trong `configs.py`.
-* **Thay đổi ngưỡng cảnh báo**: Điều chỉnh ngưỡng chênh lệch giá trong file `.env` (biến `THRESHOLD`).
-
-## 📜 License
-
-Crypto Arbitrage Bot là phần mềm mã nguồn mở, được phát hành dưới giấy phép MIT. Bạn có thể tự do sử dụng và chỉnh sửa mã nguồn.
-
-## 🤝 Liên hệ
-
-Nếu bạn gặp phải bất kỳ vấn đề nào, đừng ngần ngại mở một **issue** hoặc liên hệ qua email: `youremail@example.com`.
+- GitHub: [nguyenngocbinh](https://github.com/nguyenngocbinh)
+- Issues: Mở issue trên GitHub nếu gặp vấn đề
