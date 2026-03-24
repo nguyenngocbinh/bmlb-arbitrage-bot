@@ -183,9 +183,32 @@ class AsyncOrderService:
             notification_service: Dịch vụ thông báo
 
         Returns:
-            bool: True nếu cả hai lệnh khớp
+            dict: Kết quả giao dịch bao gồm thông tin slippage:
+                - success (bool): True nếu ít nhất 1 lệnh thành công
+                - buy_order (dict|None): Thông tin lệnh mua
+                - sell_order (dict|None): Thông tin lệnh bán
+                - expected_buy_price (float): Giá mua kỳ vọng
+                - expected_sell_price (float): Giá bán kỳ vọng
+                - actual_buy_price (float|None): Giá mua thực tế
+                - actual_sell_price (float|None): Giá bán thực tế
+                - buy_slippage_pct (float): Slippage mua (%)
+                - sell_slippage_pct (float): Slippage bán (%)
+                - total_slippage_usd (float): Tổng slippage (USD)
         """
         base_asset = extract_base_asset(symbol)
+
+        fill_result = {
+            'success': False,
+            'buy_order': None,
+            'sell_order': None,
+            'expected_buy_price': min_ask_price,
+            'expected_sell_price': max_bid_price,
+            'actual_buy_price': None,
+            'actual_sell_price': None,
+            'buy_slippage_pct': 0.0,
+            'sell_slippage_pct': 0.0,
+            'total_slippage_usd': 0.0,
+        }
 
         try:
             # Đặt lệnh mua + bán ĐỒNG THỜI
@@ -204,6 +227,10 @@ class AsyncOrderService:
             sell_success = not isinstance(sell_result, Exception)
 
             if buy_success:
+                fill_result['buy_order'] = buy_result
+                # Lấy giá thực tế từ order response (average/price)
+                actual_buy = self._extract_fill_price(buy_result, min_ask_price)
+                fill_result['actual_buy_price'] = actual_buy
                 log_info(
                     f"Lệnh mua giới hạn đã gửi đến {min_ask_ex} "
                     f"cho {amount} {base_asset} ở giá {min_ask_price}"
@@ -212,6 +239,9 @@ class AsyncOrderService:
                 log_error(f"Lỗi đặt lệnh mua trên {min_ask_ex}: {str(buy_result)}")
 
             if sell_success:
+                fill_result['sell_order'] = sell_result
+                actual_sell = self._extract_fill_price(sell_result, max_bid_price)
+                fill_result['actual_sell_price'] = actual_sell
                 log_info(
                     f"Lệnh bán giới hạn đã gửi đến {max_bid_ex} "
                     f"cho {amount} {base_asset} ở giá {max_bid_price}"
@@ -232,11 +262,24 @@ class AsyncOrderService:
                 raise OrderError(f"{min_ask_ex}/{max_bid_ex}", "arbitrage",
                                  "Cả hai lệnh đều thất bại")
 
-            # Chờ lệnh khớp (tối đa 3 phút)
-            return await self._wait_for_arbitrage_fills(
+            fill_result['success'] = True
+
+            # Chờ lệnh khớp (tối đa 3 phút) và cập nhật giá thực tế
+            wait_result = await self._wait_for_arbitrage_fills(
                 min_ask_ex, max_bid_ex, symbol, amount,
                 buy_success, sell_success, notification_service
             )
+
+            # Sau khi lệnh khớp, lấy giá fill thực tế từ closed orders
+            if wait_result:
+                await self._update_fill_prices(
+                    fill_result, min_ask_ex, max_bid_ex, symbol, amount
+                )
+
+            # Tính slippage
+            self._calculate_slippage(fill_result, amount)
+
+            return fill_result
 
         except OrderError:
             raise
@@ -504,3 +547,107 @@ class AsyncOrderService:
                 exchange_id,
                 f"Lỗi khi đợi lệnh futures khớp: {str(e)}"
             )
+
+    # ─── Slippage Helpers ─────────────────────────────────────────────
+
+    @staticmethod
+    def _extract_fill_price(order_response, expected_price):
+        """
+        Trích xuất giá fill thực tế từ response của sàn.
+
+        ccxt order response thường có:
+        - 'average': giá trung bình fill
+        - 'price': giá đặt lệnh
+        - 'filled': số lượng đã fill
+
+        Args:
+            order_response (dict): Response từ sàn
+            expected_price (float): Giá kỳ vọng (fallback)
+
+        Returns:
+            float: Giá fill thực tế
+        """
+        if not order_response or not isinstance(order_response, dict):
+            return expected_price
+
+        # Ưu tiên 'average' (giá fill trung bình thực tế)
+        if order_response.get('average') and order_response['average'] > 0:
+            return float(order_response['average'])
+
+        # Fallback: dùng 'price' từ response
+        if order_response.get('price') and order_response['price'] > 0:
+            return float(order_response['price'])
+
+        return expected_price
+
+    async def _update_fill_prices(self, fill_result, min_ask_ex, max_bid_ex,
+                                   symbol, amount):
+        """
+        Cập nhật giá fill thực tế từ closed orders sau khi lệnh đã khớp.
+
+        Args:
+            fill_result (dict): Dict kết quả để cập nhật
+            min_ask_ex (str): Sàn mua
+            max_bid_ex (str): Sàn bán
+            symbol (str): Cặp giao dịch
+            amount (float): Số lượng
+        """
+        try:
+            buy_closed, sell_closed = await asyncio.gather(
+                self.exchange_service.async_fetch_closed_orders(min_ask_ex, symbol),
+                self.exchange_service.async_fetch_closed_orders(max_bid_ex, symbol),
+                return_exceptions=True
+            )
+
+            if not isinstance(buy_closed, Exception) and buy_closed:
+                last_buy = buy_closed[-1]
+                actual = self._extract_fill_price(
+                    last_buy, fill_result['expected_buy_price']
+                )
+                fill_result['actual_buy_price'] = actual
+
+            if not isinstance(sell_closed, Exception) and sell_closed:
+                last_sell = sell_closed[-1]
+                actual = self._extract_fill_price(
+                    last_sell, fill_result['expected_sell_price']
+                )
+                fill_result['actual_sell_price'] = actual
+
+        except Exception as e:
+            log_warning(f"Không thể lấy giá fill thực tế: {str(e)}")
+
+    @staticmethod
+    def _calculate_slippage(fill_result, amount):
+        """
+        Tính slippage dựa trên giá kỳ vọng vs giá thực tế.
+
+        Slippage mua > 0 nghĩa là mua đắt hơn kỳ vọng (bất lợi).
+        Slippage bán < 0 nghĩa là bán rẻ hơn kỳ vọng (bất lợi).
+
+        Args:
+            fill_result (dict): Dict kết quả để cập nhật
+            amount (float): Số lượng giao dịch
+        """
+        expected_buy = fill_result['expected_buy_price']
+        expected_sell = fill_result['expected_sell_price']
+        actual_buy = fill_result.get('actual_buy_price') or expected_buy
+        actual_sell = fill_result.get('actual_sell_price') or expected_sell
+
+        # Slippage mua: (actual - expected) / expected * 100
+        # Dương = mua đắt hơn (bất lợi)
+        if expected_buy > 0:
+            fill_result['buy_slippage_pct'] = ((actual_buy - expected_buy) / expected_buy) * 100
+        else:
+            fill_result['buy_slippage_pct'] = 0.0
+
+        # Slippage bán: (actual - expected) / expected * 100
+        # Âm = bán rẻ hơn (bất lợi)
+        if expected_sell > 0:
+            fill_result['sell_slippage_pct'] = ((actual_sell - expected_sell) / expected_sell) * 100
+        else:
+            fill_result['sell_slippage_pct'] = 0.0
+
+        # Tổng slippage USD = cost mua thêm + doanh thu bán mất
+        buy_slippage_usd = (actual_buy - expected_buy) * amount
+        sell_slippage_usd = (expected_sell - actual_sell) * amount
+        fill_result['total_slippage_usd'] = buy_slippage_usd + sell_slippage_usd

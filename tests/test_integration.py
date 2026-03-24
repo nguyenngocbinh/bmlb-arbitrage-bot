@@ -249,7 +249,13 @@ class TestAsyncOrderServiceIntegration:
         result = await async_order_service.place_arbitrage_orders(
             'binance', 'kucoin', 'BTC/USDT', 0.01, 50000.0, 50100.0
         )
-        assert result is True
+        assert isinstance(result, dict)
+        assert result['success'] is True
+        assert result['expected_buy_price'] == 50000.0
+        assert result['expected_sell_price'] == 50100.0
+        assert 'buy_slippage_pct' in result
+        assert 'sell_slippage_pct' in result
+        assert 'total_slippage_usd' in result
         # Cả mua và bán phải được gọi
         mock_exchange_service.async_create_limit_buy_order.assert_called_once()
         mock_exchange_service.async_create_limit_sell_order.assert_called_once()

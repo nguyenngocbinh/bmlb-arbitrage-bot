@@ -43,6 +43,7 @@ class BaseBot:
         self.db = db_service or DatabaseService()
         self.session_id = None
         self.total_fees_usd = 0
+        self.total_slippage_usd = 0
         
         # Các biến chung
         self.symbol = None
@@ -436,11 +437,12 @@ class BaseBot:
             # Cập nhật tổng phí
             self.total_fees_usd += fee_usd
 
-            # Ghi giao dịch vào database
+            # Ghi giao dịch vào database (slippage sẽ được cập nhật sau khi có fill)
+            trade_id = None
             if self.session_id:
                 try:
                     cumulative_profit_usd = (self.total_absolute_profit_pct / 100) * self.howmuchusd
-                    self.db.record_trade(
+                    trade_id = self.db.record_trade(
                         self.session_id, self.opportunity_count, self.symbol,
                         min_ask_ex, max_bid_ex, self.min_ask_price, self.max_bid_price,
                         self.crypto_per_transaction, profit_with_fees_pct, profit_with_fees_usd,
@@ -453,11 +455,14 @@ class BaseBot:
             self._display_trade_report(min_ask_ex, max_bid_ex, profit_with_fees_pct, profit_with_fees_usd, fee_usd, fee_crypto)
             
             # Đặt lệnh giao dịch (async - đồng thời mua + bán)
-            await self.async_order_service.place_arbitrage_orders(
+            fill_result = await self.async_order_service.place_arbitrage_orders(
                 min_ask_ex, max_bid_ex, self.symbol,
                 self.crypto_per_transaction, self.min_ask_price, self.max_bid_price,
                 self.notification_service
             )
+
+            # Cập nhật slippage vào database và log
+            self._process_slippage(trade_id, fill_result, min_ask_ex, max_bid_ex)
             
             # Cập nhật giá trước đó
             self.prec_ask_price = self.min_ask_price
@@ -472,6 +477,59 @@ class BaseBot:
             log_error(f"Lỗi khi thực hiện giao dịch: {str(e)}")
             return False
     
+    def _process_slippage(self, trade_id, fill_result, min_ask_ex, max_bid_ex):
+        """
+        Xử lý và lưu thông tin slippage sau giao dịch.
+        
+        Args:
+            trade_id (int|None): ID giao dịch trong database
+            fill_result (dict): Kết quả fill từ async_order_service
+            min_ask_ex (str): Sàn mua
+            max_bid_ex (str): Sàn bán
+        """
+        if not fill_result or not isinstance(fill_result, dict):
+            return
+        
+        buy_slippage = fill_result.get('buy_slippage_pct', 0)
+        sell_slippage = fill_result.get('sell_slippage_pct', 0)
+        total_slippage_usd = fill_result.get('total_slippage_usd', 0)
+        actual_buy = fill_result.get('actual_buy_price')
+        actual_sell = fill_result.get('actual_sell_price')
+        
+        # Tích lũy tổng slippage cho phiên
+        if not hasattr(self, 'total_slippage_usd'):
+            self.total_slippage_usd = 0
+        self.total_slippage_usd += total_slippage_usd
+        
+        # Log slippage nếu có ý nghĩa (> 0.01%)
+        if abs(buy_slippage) > 0.01 or abs(sell_slippage) > 0.01:
+            log_warning(
+                f"Slippage giao dịch #{self.opportunity_count}: "
+                f"Mua {min_ask_ex} {buy_slippage:+.4f}% "
+                f"(kỳ vọng {fill_result.get('expected_buy_price', 0):.2f} → "
+                f"thực tế {actual_buy or 0:.2f}), "
+                f"Bán {max_bid_ex} {sell_slippage:+.4f}% "
+                f"(kỳ vọng {fill_result.get('expected_sell_price', 0):.2f} → "
+                f"thực tế {actual_sell or 0:.2f}), "
+                f"Tổng: {total_slippage_usd:+.4f} USD"
+            )
+        
+        # Cập nhật slippage vào database
+        if trade_id and self.session_id:
+            try:
+                with self.db._get_connection() as conn:
+                    conn.execute(
+                        """UPDATE trades SET 
+                           actual_buy_price = ?, actual_sell_price = ?,
+                           buy_slippage_pct = ?, sell_slippage_pct = ?,
+                           total_slippage_usd = ?
+                           WHERE id = ?""",
+                        (actual_buy, actual_sell, buy_slippage,
+                         sell_slippage, total_slippage_usd, trade_id)
+                    )
+            except Exception as e:
+                log_error(f"Lỗi khi cập nhật slippage vào database: {str(e)}")
+
     def _update_balances_after_trade(self, min_ask_ex, max_bid_ex):
         """
         Cập nhật số dư sau khi thực hiện giao dịch.

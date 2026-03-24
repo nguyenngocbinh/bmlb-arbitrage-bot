@@ -323,12 +323,36 @@ class ClassicBot(BaseBot):
             # Cập nhật tổng lợi nhuận
             self.total_absolute_profit_pct += profit_with_fees_pct
             
+            # Cập nhật tổng phí
+            self.total_fees_usd += fee_usd
+
+            # Ghi giao dịch vào database
+            trade_id = None
+            if self.session_id:
+                try:
+                    cumulative_profit_usd = (self.total_absolute_profit_pct / 100) * self.howmuchusd
+                    trade_id = self.db.record_trade(
+                        self.session_id, self.opportunity_count, self.symbol,
+                        min_ask_ex, max_bid_ex, self.min_ask_price, self.max_bid_price,
+                        self.crypto_per_transaction, profit_with_fees_pct, profit_with_fees_usd,
+                        fee_usd, fee_crypto, self.total_absolute_profit_pct, cumulative_profit_usd
+                    )
+                except Exception as e:
+                    log_error(f"Lỗi khi ghi giao dịch vào database: {str(e)}")
+            
             # Thực hiện giao dịch thực tế (async - đồng thời mua + bán)
-            trade_success = await self.async_order_service.place_arbitrage_orders(
+            fill_result = await self.async_order_service.place_arbitrage_orders(
                 min_ask_ex, max_bid_ex, self.symbol,
                 self.crypto_per_transaction, self.min_ask_price, self.max_bid_price,
                 self.notification_service
             )
+
+            # Kiểm tra thành công từ fill_result
+            trade_success = isinstance(fill_result, dict) and fill_result.get('success', False)
+            
+            # Cập nhật slippage
+            if trade_success:
+                self._process_slippage(trade_id, fill_result, min_ask_ex, max_bid_ex)
             
             # Cập nhật thống kê
             if trade_success:
@@ -369,6 +393,7 @@ class ClassicBot(BaseBot):
         log_info(f"Số giao dịch thành công: {self.stats['trades_executed']}")
         log_info(f"Số giao dịch thất bại: {self.stats['failed_trades']}")
         log_info(f"Tổng khối lượng giao dịch: {self.stats['total_volume']:.4f} USDT")
+        log_info(f"Tổng slippage: {getattr(self, 'total_slippage_usd', 0):.4f} USD")
         
         if self.stats['trades_executed'] > 0:
             avg_profit = self.total_absolute_profit_pct / self.stats['trades_executed']

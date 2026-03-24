@@ -91,6 +91,11 @@ class DatabaseService:
                     sell_exchange TEXT NOT NULL,
                     buy_price REAL NOT NULL,
                     sell_price REAL NOT NULL,
+                    actual_buy_price REAL,
+                    actual_sell_price REAL,
+                    buy_slippage_pct REAL DEFAULT 0,
+                    sell_slippage_pct REAL DEFAULT 0,
+                    total_slippage_usd REAL DEFAULT 0,
                     amount REAL NOT NULL,
                     profit_pct REAL NOT NULL,
                     profit_usd REAL NOT NULL,
@@ -290,7 +295,10 @@ class DatabaseService:
                      sell_exchange, buy_price, sell_price, amount, profit_pct,
                      profit_usd, fee_usd, fee_crypto, cumulative_profit_pct,
                      cumulative_profit_usd, status='executed',
-                     order_buy_id=None, order_sell_id=None):
+                     order_buy_id=None, order_sell_id=None,
+                     actual_buy_price=None, actual_sell_price=None,
+                     buy_slippage_pct=0, sell_slippage_pct=0,
+                     total_slippage_usd=0):
         """
         Ghi lại một giao dịch.
 
@@ -300,8 +308,8 @@ class DatabaseService:
             symbol (str): Cặp giao dịch
             buy_exchange (str): Sàn mua
             sell_exchange (str): Sàn bán
-            buy_price (float): Giá mua
-            sell_price (float): Giá bán
+            buy_price (float): Giá mua kỳ vọng
+            sell_price (float): Giá bán kỳ vọng
             amount (float): Số lượng
             profit_pct (float): Lợi nhuận %
             profit_usd (float): Lợi nhuận USD
@@ -312,6 +320,11 @@ class DatabaseService:
             status (str): Trạng thái
             order_buy_id (str, optional): ID lệnh mua
             order_sell_id (str, optional): ID lệnh bán
+            actual_buy_price (float, optional): Giá mua thực tế
+            actual_sell_price (float, optional): Giá bán thực tế
+            buy_slippage_pct (float): Slippage mua (%)
+            sell_slippage_pct (float): Slippage bán (%)
+            total_slippage_usd (float): Tổng slippage (USD)
 
         Returns:
             int: ID của giao dịch
@@ -320,12 +333,16 @@ class DatabaseService:
             cursor = conn.execute(
                 """INSERT INTO trades 
                    (session_id, trade_number, timestamp, symbol, buy_exchange, sell_exchange,
-                    buy_price, sell_price, amount, profit_pct, profit_usd, fee_usd, fee_crypto,
+                    buy_price, sell_price, actual_buy_price, actual_sell_price,
+                    buy_slippage_pct, sell_slippage_pct, total_slippage_usd,
+                    amount, profit_pct, profit_usd, fee_usd, fee_crypto,
                     cumulative_profit_pct, cumulative_profit_usd, status, order_buy_id, order_sell_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (session_id, trade_number, datetime.now(timezone.utc).isoformat(), symbol,
-                 buy_exchange, sell_exchange, buy_price, sell_price, amount,
-                 profit_pct, profit_usd, fee_usd, fee_crypto,
+                 buy_exchange, sell_exchange, buy_price, sell_price,
+                 actual_buy_price, actual_sell_price,
+                 buy_slippage_pct, sell_slippage_pct, total_slippage_usd,
+                 amount, profit_pct, profit_usd, fee_usd, fee_crypto,
                  cumulative_profit_pct, cumulative_profit_usd, status,
                  order_buy_id, order_sell_id)
             )
@@ -761,4 +778,83 @@ class DatabaseService:
             return {
                 'buy_performance': [dict(row) for row in buy_stats],
                 'sell_performance': [dict(row) for row in sell_stats]
+            }
+
+    # ─── Slippage Analytics ───────────────────────────────────────────
+
+    def get_slippage_stats(self, session_id=None):
+        """
+        Lấy thống kê slippage tổng hợp.
+
+        Args:
+            session_id (int, optional): Lọc theo phiên
+
+        Returns:
+            dict: Thống kê slippage
+        """
+        where = "WHERE status = 'executed' AND actual_buy_price IS NOT NULL"
+        params = []
+        if session_id:
+            where += " AND session_id = ?"
+            params.append(session_id)
+
+        with self._get_connection() as conn:
+            row = conn.execute(f"""
+                SELECT
+                    COUNT(*) as trades_with_slippage,
+                    COALESCE(AVG(buy_slippage_pct), 0) as avg_buy_slippage_pct,
+                    COALESCE(AVG(sell_slippage_pct), 0) as avg_sell_slippage_pct,
+                    COALESCE(AVG(total_slippage_usd), 0) as avg_slippage_usd,
+                    COALESCE(SUM(total_slippage_usd), 0) as total_slippage_usd,
+                    COALESCE(MAX(ABS(buy_slippage_pct)), 0) as max_buy_slippage_pct,
+                    COALESCE(MAX(ABS(sell_slippage_pct)), 0) as max_sell_slippage_pct,
+                    COALESCE(MAX(ABS(total_slippage_usd)), 0) as max_slippage_usd
+                FROM trades {where}
+            """, params).fetchone()
+            return dict(row)
+
+    def get_slippage_by_exchange(self, session_id=None):
+        """
+        Lấy thống kê slippage theo sàn giao dịch.
+
+        Args:
+            session_id (int, optional): Lọc theo phiên
+
+        Returns:
+            dict: Slippage trung bình khi mua/bán trên từng sàn
+        """
+        where_clause = "WHERE status = 'executed' AND actual_buy_price IS NOT NULL"
+        params_buy = []
+        params_sell = []
+        if session_id:
+            where_clause += " AND session_id = ?"
+            params_buy.append(session_id)
+            params_sell.append(session_id)
+
+        with self._get_connection() as conn:
+            buy_rows = conn.execute(f"""
+                SELECT
+                    buy_exchange as exchange,
+                    COUNT(*) as trade_count,
+                    AVG(buy_slippage_pct) as avg_slippage_pct,
+                    MAX(ABS(buy_slippage_pct)) as max_slippage_pct,
+                    SUM(ABS(buy_slippage_pct) * amount * buy_price / 100) as total_slippage_cost_usd
+                FROM trades {where_clause}
+                GROUP BY buy_exchange
+            """, params_buy).fetchall()
+
+            sell_rows = conn.execute(f"""
+                SELECT
+                    sell_exchange as exchange,
+                    COUNT(*) as trade_count,
+                    AVG(sell_slippage_pct) as avg_slippage_pct,
+                    MAX(ABS(sell_slippage_pct)) as max_slippage_pct,
+                    SUM(ABS(sell_slippage_pct) * amount * sell_price / 100) as total_slippage_cost_usd
+                FROM trades {where_clause}
+                GROUP BY sell_exchange
+            """, params_sell).fetchall()
+
+            return {
+                'buy_slippage': [dict(r) for r in buy_rows],
+                'sell_slippage': [dict(r) for r in sell_rows]
             }
