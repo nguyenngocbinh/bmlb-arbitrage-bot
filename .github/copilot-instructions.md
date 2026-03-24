@@ -1,80 +1,92 @@
-# ETL DB2/CSV → MSSQL — Project Guidelines
+# AWS Arbitrage Bot — Project Guidelines
 
 ## Architecture
-- **Python 3.10+** ETL application running on Windows Server
-- Source: DB2 LUW (ibm_db) + local CSV files
-- Target: SQL Server 2016+ (SQLAlchemy + pyodbc)
-- Web UI: Flask with Flask-Login authentication
-- Scheduler: APScheduler (cron/interval/daily)
-- Config: YAML per table (`config/tables/<name>.yaml`)
-- Credentials: `.env` file encrypted with Fernet
+- **Python 3.10+** crypto arbitrage bot chạy trên Windows/Linux
+- Exchanges: Binance, KuCoin, OKX, Bybit (qua ccxt/ccxt.pro)
+- Database: SQLite (lịch sử giao dịch, phiên, thống kê)
+- Web Dashboard: FastAPI + Jinja2 (REST API + HTML dashboard)
+- Bot modes: `classic`, `delta-neutral`, `fake-money`
+- Async: asyncio + ccxt.pro cho WebSocket orderbook
 
 ## Project Structure
 ```
-src/connectors/     # db2_connector, mssql_connector, csv_connector
-src/etl/            # engine, loader, schema_manager, chunker, validator
-src/scheduler/      # job_scheduler (APScheduler wrapper)
-src/logging/        # etl_logger (DB-backed job logs)
-src/config/         # config_loader, config_versioning
-src/security/       # crypto (Fernet encrypt/decrypt)
-src/web/            # Flask app, auth, routes, templates, static
-config/             # app.yaml + tables/*.yaml
-scripts/            # init_db.py
+bots/               # Bot implementations (base → classic, delta-neutral, fake-money)
+services/           # Business logic services
+  ├── exchange_service.py       # Kết nối & quản lý sàn (ccxt.pro)
+  ├── balance_service.py        # Quản lý số dư
+  ├── order_service.py          # Đặt lệnh đồng bộ
+  ├── async_order_service.py    # Đặt lệnh bất đồng bộ
+  ├── database_service.py       # SQLite persistence
+  ├── notification_service.py   # Telegram notification
+  ├── risk_manager.py           # Stop-loss & risk management
+  ├── rate_limiter.py           # Rate limiting middleware
+  └── multi_pair_manager.py     # Giao dịch đa cặp
+utils/              # Helpers, exceptions, logger, env_loader
+backtest/           # Backtesting framework (data_recorder, engine, analyzer)
+web/                # FastAPI dashboard (app.py, templates/)
+tests/              # pytest test suite (12 files, 221+ tests)
+configs.py          # Global configuration
+main.py             # Entry point
 ```
 
 ## Code Style
-- Use `logging.getLogger(__name__)` for all modules
-- Use context managers for database connections (`with connector.connect() as conn:`)
-- All SQL queries must use **parameterized statements** (`:param_name`) — never f-string interpolation for user data
-- Type hints for function signatures
-- Docstrings for public classes and methods
-
-## ETL Modes
-- `insert_skip` — INSERT only new rows (skip if key exists)
-- `upsert` — MERGE (UPDATE if key exists, INSERT if not)
-- `delete_insert` — DELETE by rpt_dt period, then INSERT
+- **Vietnamese**: Comments, docstrings, UI text, thông báo lỗi người dùng
+- **English**: Variable names, function names, class names, module names
+- Type hints cho tất cả function signatures
+- Docstrings cho tất cả public classes và methods
+- Dùng `async/await` cho tất cả I/O operations
+- Context managers cho database connections (`with self._get_connection() as conn:`)
+- Custom exceptions trong `utils/exceptions.py`
+- Logging qua `utils/logger.py` (log_info, log_error, log_warning, log_profit)
 
 ## Key Patterns
-- Composite primary keys: `[contract_id, rpt_dt]`, `[customer_id, rpt_dt]`
-- rpt_dt column can be DATE, VARCHAR, or INT
-- NULL key handling: configurable (`delete` / `skip` / `keep`)
-- Chunking threshold: 100k rows, parallel workers max 4
-- Connection pool: DB2 max 5, MSSQL max 10+5 overflow
+- **Inheritance**: BaseBot → ClassicBot, DeltaNeutralBot, FakeMoneyBot
+- **Service Layer**: Services tách biệt — exchange, balance, order, database, notification
+- **Risk Management**: Drawdown limits, consecutive loss limits, cooldown periods
+- **Rate Limiting**: Token bucket per exchange, configurable rates
+- **Multi-pair**: Concurrent arbitrage across multiple trading pairs
+- **Async Orders**: Parallel order execution trên nhiều sàn cùng lúc
+- **Slippage Tracking**: Theo dõi chênh lệch giữa expected vs actual price
 
-## DB2 → MSSQL Type Mapping
-| DB2 | MSSQL |
-|-----|-------|
-| VARCHAR(n) | NVARCHAR(n) |
-| INTEGER | INT |
-| DECIMAL(p,s) | DECIMAL(p,s) |
-| TIMESTAMP | DATETIME2 |
-| CLOB | NVARCHAR(MAX) |
-| BLOB | VARBINARY(MAX) |
+## Database
+- SQLite with WAL mode, foreign keys ON
+- Tables: sessions, trades, opportunities, balance_snapshots
+- Context manager pattern: `_get_connection()` yields `sqlite3.Connection`
+- Parameterized queries only — KHÔNG bao giờ dùng f-string cho SQL
+
+## Web Dashboard
+- FastAPI + Jinja2 templates
+- Starlette 1.0.0: `TemplateResponse(request, "name.html", context={...})`
+- REST API endpoints: `/api/sessions`, `/api/trades`, `/api/stats`
+- HTML dashboard: `/`
 
 ## Security
-- Credentials in `.env` (encrypted with Fernet), never committed to git
-- Web UI requires login/password
-- Audit trail: Windows username logged with every ETL run
-- OWASP: parameterized queries, CSRF protection, input validation
+- Credentials trong `.env`, KHÔNG commit lên git
+- Exchange API keys qua environment variables
+- Input validation cho tất cả API endpoints
+- OWASP compliance: parameterized queries, no hardcoded secrets
 
 ## Build & Run
 ```bash
 pip install -r requirements.txt
-python -m src.security.crypto generate-key    # Generate Fernet key
-python -m src.security.crypto encrypt         # Encrypt .env passwords
-python scripts/init_db.py                     # Init DB tables + admin user
-python run.py                                 # Start web UI + scheduler
-python run.py --run --table <name>            # Run ETL for one table
-python run.py --dry-run --table <name>        # Dry-run (no insert)
+python main.py                              # Run bot (interactive mode)
+python main.py --mode classic               # Run classic arbitrage
+python main.py --mode fake-money            # Run with fake money (testing)
+pytest tests/ -v                            # Run all tests
+pytest tests/test_backtest.py -v            # Run backtest tests
 ```
 
 ## Testing
-- Tests in `tests/` directory
-- Run with `pytest` from project root
+- pytest + pytest-asyncio
+- 12 test files, 221+ tests
+- Tests trong `tests/` directory
+- Mock ccxt exchanges cho unit tests
+- `pytest tests/ -v` từ project root
 
-## Conventions
-- Each table gets its own YAML config in `config/tables/`
-- Schema drift: auto ALTER TABLE + warning log
-- Config versioning: changes stored in MSSQL `etl_config_history`
-- ETL logs: `etl_job_log` table in MSSQL target database
-- All log tables auto-created on `scripts/init_db.py`
+## Configuration
+- `configs.py`: Global settings (exchanges, fees, risk, paths)
+- `.env`: Credentials (API keys, Telegram token)
+- `SUPPORTED_EXCHANGES`: kucoin, binance, bybit, okx, kucoinfutures
+- `EXCHANGE_FEES`: Fee config per exchange
+- `RISK_CONFIG`: Drawdown, loss limits, cooldown settings
+- `BOT_MODES`: fake-money, classic, delta-neutral
