@@ -121,12 +121,12 @@ class ClassicBot(BaseBot):
             self.usd = self.balance_service.initialize_balances(self.exchanges, self.symbol, self.howmuchusd)
             self.crypto = {exchange: 0 for exchange in self.exchanges}  # Khởi tạo số dư crypto bằng 0
             
-            # Đặt lệnh mua ban đầu
+            # Đặt lệnh mua ban đầu (async - đồng thời trên tất cả sàn)
             success = False
             for attempt in range(self.max_retries):
                 try:
-                    log_info(f"Lần thử {attempt+1}/{self.max_retries} đặt lệnh mua ban đầu")
-                    success = self.order_service.place_initial_orders(
+                    log_info(f"Lần thử {attempt+1}/{self.max_retries} đặt lệnh mua ban đầu (async)")
+                    success = await self.async_order_service.place_initial_orders(
                         self.exchanges, self.symbol, crypto_per_exchange, average_price, self.notification_service
                     )
                     if success:
@@ -323,8 +323,8 @@ class ClassicBot(BaseBot):
             # Cập nhật tổng lợi nhuận
             self.total_absolute_profit_pct += profit_with_fees_pct
             
-            # Thực hiện giao dịch thực tế
-            trade_success = self.order_service.place_arbitrage_orders(
+            # Thực hiện giao dịch thực tế (async - đồng thời mua + bán)
+            trade_success = await self.async_order_service.place_arbitrage_orders(
                 min_ask_ex, max_bid_ex, self.symbol,
                 self.crypto_per_transaction, self.min_ask_price, self.max_bid_price,
                 self.notification_service
@@ -401,10 +401,10 @@ class ClassicBot(BaseBot):
         Returns:
             float: Tổng lợi nhuận (phần trăm)
         """
-        # Bán tất cả crypto trên tất cả sàn
+        # Bán tất cả crypto trên tất cả sàn (async - đồng thời)
         try:
-            log_info(f"Bán tất cả {self.symbol} trên {self.exchanges}")
-            self.balance_service.emergency_convert_all(self.symbol, self.exchanges)
+            log_info(f"Bán tất cả {self.symbol} trên {self.exchanges} (async)")
+            await self.async_order_service.async_emergency_sell(self.symbol, self.exchanges)
             log_info("Đã bán tất cả crypto thành công")
         except Exception as e:
             log_error(f"Lỗi khi bán crypto: {str(e)}")

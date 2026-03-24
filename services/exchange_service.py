@@ -542,3 +542,286 @@ class ExchangeService:
             
         except Exception as e:
             raise FuturesError(exchange_id, f"Không thể tạo lệnh futures: {str(e)}")
+
+    # ─── Async Methods ────────────────────────────────────────────────
+    # Các phương thức async sử dụng ccxt.pro cho đặt lệnh đồng thời
+
+    async def _get_or_create_pro_exchange(self, exchange_id):
+        """
+        Lấy hoặc tạo đối tượng sàn giao dịch ccxt.pro dùng lại được.
+        
+        Args:
+            exchange_id (str): ID của sàn giao dịch
+        
+        Returns:
+            object: Đối tượng sàn giao dịch ccxt.pro
+        """
+        if not hasattr(self, '_pro_instances'):
+            self._pro_instances = {}
+        
+        if exchange_id not in self._pro_instances:
+            if exchange_id not in self.exchanges:
+                raise ExchangeError(exchange_id, "Sàn giao dịch không được hỗ trợ hoặc chưa được cấu hình")
+            exchange_class = getattr(ccxt.pro, exchange_id)
+            self._pro_instances[exchange_id] = exchange_class(self.exchanges[exchange_id])
+        
+        return self._pro_instances[exchange_id]
+
+    async def close_all_pro_exchanges(self):
+        """Đóng tất cả kết nối ccxt.pro."""
+        if hasattr(self, '_pro_instances'):
+            for exchange_id, exchange in self._pro_instances.items():
+                try:
+                    await exchange.close()
+                except Exception:
+                    pass
+            self._pro_instances.clear()
+
+    async def async_create_limit_buy_order(self, exchange_id, symbol, amount, price):
+        """
+        Tạo lệnh mua giới hạn (async).
+        
+        Args:
+            exchange_id (str): ID của sàn giao dịch
+            symbol (str): Ký hiệu của cặp giao dịch
+            amount (float): Số lượng cần mua
+            price (float): Giá mua
+        
+        Returns:
+            dict: Thông tin lệnh đã tạo
+        """
+        try:
+            pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
+            return await pro_exchange.create_limit_buy_order(symbol, amount, price)
+        except Exception as e:
+            raise ExchangeError(exchange_id, f"Async: Không thể tạo lệnh mua giới hạn cho {symbol}: {str(e)}")
+
+    async def async_create_limit_sell_order(self, exchange_id, symbol, amount, price):
+        """
+        Tạo lệnh bán giới hạn (async).
+        
+        Args:
+            exchange_id (str): ID của sàn giao dịch
+            symbol (str): Ký hiệu của cặp giao dịch
+            amount (float): Số lượng cần bán
+            price (float): Giá bán
+        
+        Returns:
+            dict: Thông tin lệnh đã tạo
+        """
+        try:
+            pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
+            return await pro_exchange.create_limit_sell_order(symbol, amount, price)
+        except Exception as e:
+            raise ExchangeError(exchange_id, f"Async: Không thể tạo lệnh bán giới hạn cho {symbol}: {str(e)}")
+
+    async def async_create_market_buy_order(self, exchange_id, symbol, amount, params=None):
+        """
+        Tạo lệnh mua thị trường (async).
+        
+        Args:
+            exchange_id (str): ID của sàn giao dịch
+            symbol (str): Ký hiệu của cặp giao dịch
+            amount (float): Số lượng cần mua
+            params (dict, optional): Tham số bổ sung
+        
+        Returns:
+            dict: Thông tin lệnh đã tạo
+        """
+        params = params or {}
+        try:
+            pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
+            return await pro_exchange.create_market_buy_order(symbol, amount, params)
+        except Exception as e:
+            raise ExchangeError(exchange_id, f"Async: Không thể tạo lệnh mua thị trường cho {symbol}: {str(e)}")
+
+    async def async_create_market_sell_order(self, exchange_id, symbol, amount, params=None):
+        """
+        Tạo lệnh bán thị trường (async).
+        
+        Args:
+            exchange_id (str): ID của sàn giao dịch
+            symbol (str): Ký hiệu của cặp giao dịch
+            amount (float): Số lượng cần bán
+            params (dict, optional): Tham số bổ sung
+        
+        Returns:
+            dict: Thông tin lệnh đã tạo
+        """
+        params = params or {}
+        try:
+            pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
+            return await pro_exchange.create_market_sell_order(symbol, amount, params)
+        except Exception as e:
+            raise ExchangeError(exchange_id, f"Async: Không thể tạo lệnh bán thị trường cho {symbol}: {str(e)}")
+
+    async def async_fetch_open_orders(self, exchange_id, symbol):
+        """
+        Lấy danh sách lệnh đang mở (async).
+        
+        Args:
+            exchange_id (str): ID của sàn giao dịch
+            symbol (str): Ký hiệu của cặp giao dịch
+        
+        Returns:
+            list: Danh sách các lệnh đang mở
+        """
+        try:
+            pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
+            return await pro_exchange.fetch_open_orders(symbol)
+        except Exception as e:
+            raise ExchangeError(exchange_id, f"Async: Không thể lấy danh sách lệnh đang mở cho {symbol}: {str(e)}")
+
+    async def async_fetch_closed_orders(self, exchange_id, symbol):
+        """
+        Lấy danh sách lệnh đã đóng (async).
+        
+        Args:
+            exchange_id (str): ID của sàn giao dịch
+            symbol (str): Ký hiệu của cặp giao dịch
+        
+        Returns:
+            list: Danh sách các lệnh đã đóng
+        """
+        try:
+            pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
+            return await pro_exchange.fetch_closed_orders(symbol)
+        except Exception as e:
+            raise ExchangeError(exchange_id, f"Async: Không thể lấy danh sách lệnh đã đóng cho {symbol}: {str(e)}")
+
+    async def async_cancel_order(self, exchange_id, order_id, symbol):
+        """
+        Hủy một lệnh (async).
+        
+        Args:
+            exchange_id (str): ID của sàn giao dịch
+            order_id (str): ID của lệnh cần hủy
+            symbol (str): Ký hiệu của cặp giao dịch
+        
+        Returns:
+            dict: Thông tin lệnh đã hủy
+        """
+        try:
+            pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
+            return await pro_exchange.cancel_order(order_id, symbol)
+        except Exception as e:
+            raise ExchangeError(exchange_id, f"Async: Không thể hủy lệnh {order_id} cho {symbol}: {str(e)}")
+
+    async def async_get_ticker(self, exchange_id, symbol):
+        """
+        Lấy thông tin ticker (async).
+        
+        Args:
+            exchange_id (str): ID của sàn giao dịch
+            symbol (str): Ký hiệu của cặp giao dịch
+        
+        Returns:
+            dict: Thông tin ticker
+        """
+        try:
+            pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
+            return await pro_exchange.fetch_ticker(symbol)
+        except Exception as e:
+            raise ExchangeError(exchange_id, f"Async: Không thể lấy ticker cho {symbol}: {str(e)}")
+
+    async def async_get_balance(self, exchange_id, symbol):
+        """
+        Lấy số dư tài sản (async).
+        
+        Args:
+            exchange_id (str): ID của sàn giao dịch
+            symbol (str): Ký hiệu của tài sản
+        
+        Returns:
+            float: Số dư
+        """
+        try:
+            clean_symbol = extract_base_asset(symbol) if symbol != 'USDT' else 'USDT'
+            pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
+            balance = await pro_exchange.fetch_balance()
+            if clean_symbol in balance['free'] and balance['free'][clean_symbol] != 0:
+                return balance['free'][clean_symbol]
+            return 0
+        except Exception as e:
+            raise ExchangeError(exchange_id, f"Async: Không thể lấy số dư của {symbol}: {str(e)}")
+
+    async def async_emergency_convert(self, exchange_id, symbol, keep_percentage=0.01):
+        """
+        Chuyển đổi khẩn cấp tài sản sang USDT (async).
+        
+        Args:
+            exchange_id (str): ID của sàn giao dịch
+            symbol (str): Ký hiệu của cặp giao dịch
+            keep_percentage (float): Phần trăm giữ lại
+        
+        Returns:
+            dict: Thông tin lệnh bán
+        """
+        try:
+            pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
+            
+            # Hủy tất cả lệnh đang mở
+            try:
+                open_orders = await pro_exchange.fetch_open_orders(symbol)
+                for order in open_orders:
+                    await pro_exchange.cancel_order(order['id'], symbol)
+            except Exception:
+                pass
+            
+            # Lấy số dư
+            base_asset = extract_base_asset(symbol)
+            balance = await pro_exchange.fetch_balance()
+            asset_balance = balance['free'].get(base_asset, 0)
+            balance_to_sell = asset_balance - (asset_balance * keep_percentage)
+            
+            # Kiểm tra số dư tối thiểu
+            ticker = await pro_exchange.fetch_ticker(symbol)
+            min_amount_in_base = 10 / ticker['last']
+            
+            if balance_to_sell > min_amount_in_base:
+                return await pro_exchange.create_market_sell_order(symbol, round(balance_to_sell, 4))
+            else:
+                log_info(f"Không đủ {base_asset} trên {exchange_id}.")
+                return None
+        except Exception as e:
+            raise ExchangeError(exchange_id, f"Async: Không thể chuyển đổi khẩn cấp cho {symbol}: {str(e)}")
+
+    async def async_create_futures_order(self, exchange_id, symbol, type, side, amount, params=None):
+        """
+        Tạo lệnh futures (async).
+        
+        Args:
+            exchange_id (str): ID sàn giao dịch
+            symbol (str): Ký hiệu cặp giao dịch
+            type (str): Loại lệnh (market, limit)
+            side (str): Hướng đặt lệnh (buy, sell)
+            amount (float): Số lượng
+            params (dict, optional): Tham số bổ sung
+        
+        Returns:
+            dict: Thông tin lệnh
+        """
+        params = params or {}
+        try:
+            if not symbol.endswith(':USDT') and ':USDT' not in symbol:
+                symbol = f"{extract_base_asset(symbol)}:USDT"
+            
+            pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
+            
+            if type == 'market':
+                if side == 'buy':
+                    return await pro_exchange.create_market_buy_order(symbol, amount, params)
+                elif side == 'sell':
+                    return await pro_exchange.create_market_sell_order(symbol, amount, params)
+            elif type == 'limit':
+                price = params.pop('price', None)
+                if not price:
+                    raise FuturesError(exchange_id, "Giá bắt buộc phải có cho lệnh giới hạn")
+                if side == 'buy':
+                    return await pro_exchange.create_limit_buy_order(symbol, amount, price, params)
+                elif side == 'sell':
+                    return await pro_exchange.create_limit_sell_order(symbol, amount, price, params)
+            
+            raise FuturesError(exchange_id, f"Loại lệnh không hợp lệ: {type}")
+        except Exception as e:
+            raise FuturesError(exchange_id, f"Async: Không thể tạo lệnh futures: {str(e)}")

@@ -133,8 +133,8 @@ class DeltaNeutralBot(BaseBot):
             self.usd = self.balance_service.initialize_balances(self.exchanges, self.symbol, spot_investment)
             self.crypto = {exchange: 0 for exchange in self.exchanges}  # Khởi tạo số dư crypto bằng 0
             
-            # Đặt lệnh mua ban đầu trên các sàn spot
-            success = self.order_service.place_initial_orders(
+            # Đặt lệnh mua ban đầu trên các sàn spot (async - đồng thời)
+            success = await self.async_order_service.place_initial_orders(
                 self.exchanges, 
                 self.symbol, 
                 (spot_investment / 2) / (len(self.exchanges) * average_price), 
@@ -174,8 +174,8 @@ class DeltaNeutralBot(BaseBot):
                 # Tính số lượng cần short dựa trên giá trung bình và số tiền đầu tư
                 quantity_to_short = max(min_futures_quantity, round(futures_investment / average_price, 3))
                 
-                # Đặt lệnh short
-                self.order_service.place_futures_short_order(
+                # Đặt lệnh short (async)
+                await self.async_order_service.place_futures_short_order(
                     self.futures_exchange, 
                     futures_symbol, 
                     quantity_to_short, 
@@ -195,8 +195,8 @@ class DeltaNeutralBot(BaseBot):
                 # Đợi lệnh được thực hiện
                 log_info("Đang đợi 120 giây để lệnh short được thực hiện...")
                 
-                # Kiểm tra trạng thái lệnh short
-                short_filled = self.order_service.wait_for_futures_order_fill(
+                # Kiểm tra trạng thái lệnh short (async)
+                short_filled = await self.async_order_service.wait_for_futures_order_fill(
                     self.futures_exchange, 
                     futures_symbol, 
                     120
@@ -247,15 +247,15 @@ class DeltaNeutralBot(BaseBot):
         Returns:
             float: Tổng lợi nhuận (phần trăm)
         """
-        # Bán tất cả crypto trên tất cả sàn
+        # Bán tất cả crypto trên tất cả sàn (async - đồng thời)
         try:
-            log_info(f"Bán tất cả {self.symbol} trên {self.exchanges}")
-            self.balance_service.emergency_convert_all(self.symbol, self.exchanges)
+            log_info(f"Bán tất cả {self.symbol} trên {self.exchanges} (async)")
+            await self.async_order_service.async_emergency_sell(self.symbol, self.exchanges)
             log_info("Đã bán tất cả crypto thành công")
         except Exception as e:
             log_error(f"Lỗi khi bán crypto: {str(e)}")
         
-        # Đóng vị thế short
+        # Đóng vị thế short (async)
         try:
             if self.futures_amount > 0:
                 # Lấy cặp giao dịch futures
@@ -263,8 +263,8 @@ class DeltaNeutralBot(BaseBot):
                 if not futures_symbol.endswith(':USDT'):
                     futures_symbol = f"{extract_base_asset(self.symbol)}:USDT"
                 
-                # Đóng vị thế short
-                self.order_service.close_futures_short_order(
+                # Đóng vị thế short (async)
+                await self.async_order_service.close_futures_short_order(
                     self.futures_exchange, 
                     futures_symbol, 
                     self.futures_amount, 
@@ -290,13 +290,13 @@ class DeltaNeutralBot(BaseBot):
         Returns:
             float: Tổng lợi nhuận (phần trăm)
         """
-        # Bán tất cả crypto trên các sàn spot
+        # Bán tất cả crypto trên các sàn spot (async - đồng thời)
         try:
-            self.balance_service.emergency_convert_all(self.symbol, self.exchanges)
+            await self.async_order_service.async_emergency_sell(self.symbol, self.exchanges)
         except Exception as e:
             log_error(f"Lỗi khi bán khẩn cấp crypto: {str(e)}")
         
-        # Đóng vị thế short nếu đã mở
+        # Đóng vị thế short nếu đã mở (async)
         try:
             if self.futures_amount > 0:
                 # Lấy cặp giao dịch futures
@@ -304,8 +304,8 @@ class DeltaNeutralBot(BaseBot):
                 if not futures_symbol.endswith(':USDT'):
                     futures_symbol = f"{extract_base_asset(self.symbol)}:USDT"
                 
-                # Đóng vị thế short
-                self.order_service.close_futures_short_order(
+                # Đóng vị thế short (async)
+                await self.async_order_service.close_futures_short_order(
                     self.futures_exchange, 
                     futures_symbol, 
                     self.futures_amount, 

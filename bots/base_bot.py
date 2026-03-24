@@ -14,6 +14,7 @@ from utils.exceptions import ArbitrageError, ExchangeError, InsufficientBalanceE
 from utils.helpers import show_time, extract_base_asset
 from configs import PROFIT_CRITERIA_PCT, PROFIT_CRITERIA_USD, ENABLE_CTRL_C_HANDLING
 from services.database_service import DatabaseService
+from services.async_order_service import AsyncOrderService
 
 
 class BaseBot:
@@ -36,6 +37,7 @@ class BaseBot:
         self.exchange_service = exchange_service
         self.balance_service = balance_service
         self.order_service = order_service
+        self.async_order_service = AsyncOrderService(exchange_service)
         self.notification_service = notification_service
         self.config = config or {}
         self.db = db_service or DatabaseService()
@@ -450,8 +452,8 @@ class BaseBot:
             # Tạo báo cáo giao dịch
             self._display_trade_report(min_ask_ex, max_bid_ex, profit_with_fees_pct, profit_with_fees_usd, fee_usd, fee_crypto)
             
-            # Đặt lệnh giao dịch
-            self.order_service.place_arbitrage_orders(
+            # Đặt lệnh giao dịch (async - đồng thời mua + bán)
+            await self.async_order_service.place_arbitrage_orders(
                 min_ask_ex, max_bid_ex, self.symbol,
                 self.crypto_per_transaction, self.min_ask_price, self.max_bid_price,
                 self.notification_service
