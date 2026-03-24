@@ -24,6 +24,9 @@ from services.order_service import OrderService
 from services.notification_service import NotificationService
 from services.database_service import DatabaseService
 
+# Import multi-pair
+from services.multi_pair_manager import MultiPairManager
+
 # Import các bot
 from bots.classic_bot import ClassicBot
 from bots.delta_neutral_bot import DeltaNeutralBot
@@ -104,6 +107,7 @@ def parse_arguments():
     parser.add_argument('--debug', action='store_true', help='Kích hoạt chế độ debug')
     parser.add_argument('--no-banner', action='store_true', help='Không hiển thị banner')
     parser.add_argument('--dry-run', action='store_true', help='Chạy mà không thực hiện giao dịch thực tế')
+    parser.add_argument('--symbols', nargs='+', help='Nhiều cặp giao dịch (vd: --symbols BTC/USDT ETH/USDT)')
     
     return parser.parse_args()
 
@@ -225,17 +229,18 @@ async def find_best_symbol(exchange_service, exchanges):
         return default_pair
 
 
-async def run_bot(mode, symbol, usdt_amount, renew_time, exchanges, dry_run=False):
+async def run_bot(mode, symbol, usdt_amount, renew_time, exchanges, dry_run=False, symbols=None):
     """
     Chạy bot giao dịch với các tham số đã cho.
     
     Args:
         mode (str): Chế độ bot (fake-money, classic, delta-neutral)
-        symbol (str): Ký hiệu của cặp giao dịch
+        symbol (str): Ký hiệu của cặp giao dịch (single pair)
         usdt_amount (float): Số lượng USDT để giao dịch
         renew_time (int): Thời gian làm mới (phút)
         exchanges (list): Danh sách tên các sàn giao dịch
         dry_run (bool): Nếu True, bot sẽ không thực hiện giao dịch thực tế
+        symbols (list, optional): Danh sách cặp giao dịch cho multi-pair
         
     Returns:
         float: Tổng lợi nhuận (phần trăm)
@@ -256,6 +261,28 @@ async def run_bot(mode, symbol, usdt_amount, renew_time, exchanges, dry_run=Fals
         # Khởi tạo balance files
         balance_service.initialize_balance_files(usdt_amount)
         
+        # Multi-pair mode
+        if symbols and len(symbols) > 1:
+            log_info(f"Multi-pair mode: {len(symbols)} cặp")
+
+            def _bot_factory():
+                if mode == "fake-money" or dry_run:
+                    return FakeMoneyBot(exchange_service, balance_service, order_service, notification_service, db_service)
+                elif mode == "classic":
+                    return ClassicBot(exchange_service, balance_service, order_service, notification_service, db_service)
+                elif mode == "delta-neutral":
+                    return DeltaNeutralBot(exchange_service, balance_service, order_service, notification_service, db_service)
+                else:
+                    return FakeMoneyBot(exchange_service, balance_service, order_service, notification_service, db_service)
+
+            manager = MultiPairManager(
+                _bot_factory, symbols, exchanges,
+                usdt_amount, renew_time, notification_service
+            )
+            results = await manager.start()
+            return manager.total_profit_pct
+
+        # Single pair mode
         # Tìm cặp giao dịch nếu không được chỉ định
         if not symbol:
             symbol = await find_best_symbol(exchange_service, exchanges)
@@ -321,6 +348,7 @@ async def main():
             exchanges = [args.exchange1, args.exchange2, args.exchange3]
             symbol = args.symbol
             dry_run = args.dry_run
+            symbols = args.symbols  # Multi-pair
             
         # Nếu không có tham số dòng lệnh, lấy thông tin từ người dùng
         else:
@@ -335,6 +363,7 @@ async def main():
             exchanges = [inputs["exchange_1"], inputs["exchange_2"], inputs["exchange_3"]]
             symbol = inputs["crypto"] if inputs["crypto"] else None
             dry_run = False  # Mặc định không phải dry run khi nhập thủ công
+            symbols = None  # Manual mode không hỗ trợ multi-pair
         
         # Kiểm tra chế độ
         if mode not in BOT_MODES:
@@ -345,7 +374,7 @@ async def main():
         i = 0
         while True:
             # Chạy bot với các tham số đã cho
-            profit_pct = await run_bot(mode, symbol, usdt_amount, renew_time, exchanges, dry_run)
+            profit_pct = await run_bot(mode, symbol, usdt_amount, renew_time, exchanges, dry_run, symbols)
             
             # Đọc số dư mới từ tệp
             with open('balance.txt', 'r') as f:
