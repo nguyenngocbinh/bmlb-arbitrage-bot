@@ -20,7 +20,7 @@ class DeltaNeutralBot(BaseBot):
     Mua vào tiền điện tử trên các sàn spot và mở vị thế short trên futures.
     """
     
-    def __init__(self, exchange_service, balance_service, order_service, notification_service):
+    def __init__(self, exchange_service, balance_service, order_service, notification_service, db_service=None):
         """
         Khởi tạo bot giao dịch delta-neutral.
         
@@ -29,13 +29,15 @@ class DeltaNeutralBot(BaseBot):
             balance_service (BalanceService): Dịch vụ quản lý số dư
             order_service (OrderService): Dịch vụ quản lý lệnh
             notification_service (NotificationService): Dịch vụ thông báo
+            db_service (DatabaseService, optional): Dịch vụ cơ sở dữ liệu
         """
         super().__init__(
             exchange_service,
             balance_service,
             order_service,
             notification_service,
-            {'fees': EXCHANGE_FEES}
+            {'fees': EXCHANGE_FEES},
+            db_service
         )
         
         # Biến cho chiến lược delta-neutral
@@ -62,6 +64,15 @@ class DeltaNeutralBot(BaseBot):
         try:
             log_info(f"Bắt đầu phiên giao dịch delta-neutral với tham số: {self.symbol}, {self.exchanges}, {self.howmuchusd} USDT")
             self.start_time = time.time()
+            
+            # Tạo phiên giao dịch trong database
+            try:
+                self.session_id = self.db.create_session(
+                    'delta-neutral', self.symbol, self.exchanges,
+                    self.howmuchusd, int(self.timeout - time.time()) // 60
+                )
+            except Exception as e:
+                log_error(f"Lỗi khi tạo phiên trong database: {str(e)}")
             
             # Tính toán số tiền để mở vị thế delta-neutral
             spot_investment = self.howmuchusd * (2/3)  # 2/3 số tiền cho giao dịch spot
@@ -212,6 +223,14 @@ class DeltaNeutralBot(BaseBot):
         except Exception as e:
             log_error(f"Lỗi khi chạy bot: {str(e)}")
             log_debug(f"Chi tiết lỗi: {traceback.format_exc()}")
+            
+            # Ghi lỗi vào database
+            if self.session_id:
+                try:
+                    self.db.record_error('bot_crash', str(e), session_id=self.session_id, details=traceback.format_exc())
+                    self.db.update_session(self.session_id, status='error', error_message=str(e))
+                except Exception:
+                    pass
             
             # Thực hiện bán khẩn cấp và đóng vị thế nếu có lỗi
             try:

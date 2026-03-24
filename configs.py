@@ -46,3 +46,6 @@ BOT_MODES = ['fake-money', 'classic', 'delta-neutral']
 BALANCE_FILE = 'balance.txt'
 START_BALANCE_FILE = 'start_balance.txt'
 SYMBOL_FILE = 'symbol.txt'
+
+# Database
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'arbitrage.db')

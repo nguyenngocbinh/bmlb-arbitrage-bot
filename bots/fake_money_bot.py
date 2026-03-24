@@ -18,7 +18,7 @@ class FakeMoneyBot(BaseBot):
     Bot mô phỏng giao dịch với tiền ảo, không thực hiện giao dịch thực tế.
     """
     
-    def __init__(self, exchange_service, balance_service, order_service, notification_service):
+    def __init__(self, exchange_service, balance_service, order_service, notification_service, db_service=None):
         """
         Khởi tạo bot mô phỏng.
         
@@ -27,13 +27,15 @@ class FakeMoneyBot(BaseBot):
             balance_service (BalanceService): Dịch vụ quản lý số dư
             order_service (OrderService): Dịch vụ quản lý lệnh
             notification_service (NotificationService): Dịch vụ thông báo
+            db_service (DatabaseService, optional): Dịch vụ cơ sở dữ liệu
         """
         super().__init__(
             exchange_service, 
             balance_service, 
             order_service, 
             notification_service,
-            {'fees': EXCHANGE_FEES}
+            {'fees': EXCHANGE_FEES},
+            db_service
         )
     
     async def start(self):
@@ -46,6 +48,15 @@ class FakeMoneyBot(BaseBot):
         try:
             log_info(f"Bắt đầu phiên mô phỏng với tham số: {self.symbol}, {self.exchanges}, {self.howmuchusd} USDT")
             self.start_time = time.time()
+            
+            # Tạo phiên giao dịch trong database
+            try:
+                self.session_id = self.db.create_session(
+                    'fake-money', self.symbol, self.exchanges,
+                    self.howmuchusd, int(self.timeout - time.time()) // 60
+                )
+            except Exception as e:
+                log_error(f"Lỗi khi tạo phiên trong database: {str(e)}")
             
             # Lấy giá trung bình toàn cầu
             average_price = await self.exchange_service.get_global_average_price(self.exchanges, self.symbol)

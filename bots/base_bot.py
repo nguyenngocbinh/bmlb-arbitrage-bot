@@ -13,6 +13,7 @@ from utils.logger import log_info, log_error, log_warning, log_profit, log_oppor
 from utils.exceptions import ArbitrageError, ExchangeError, InsufficientBalanceError, OrderError
 from utils.helpers import show_time, extract_base_asset
 from configs import PROFIT_CRITERIA_PCT, PROFIT_CRITERIA_USD, ENABLE_CTRL_C_HANDLING
+from services.database_service import DatabaseService
 
 
 class BaseBot:
@@ -20,7 +21,7 @@ class BaseBot:
     Lớp bot giao dịch cơ sở với các chức năng chung.
     """
     
-    def __init__(self, exchange_service, balance_service, order_service, notification_service, config=None):
+    def __init__(self, exchange_service, balance_service, order_service, notification_service, config=None, db_service=None):
         """
         Khởi tạo bot giao dịch.
         
@@ -30,12 +31,16 @@ class BaseBot:
             order_service (OrderService): Dịch vụ quản lý lệnh
             notification_service (NotificationService): Dịch vụ thông báo
             config (dict, optional): Cấu hình cho bot
+            db_service (DatabaseService, optional): Dịch vụ cơ sở dữ liệu
         """
         self.exchange_service = exchange_service
         self.balance_service = balance_service
         self.order_service = order_service
         self.notification_service = notification_service
         self.config = config or {}
+        self.db = db_service or DatabaseService()
+        self.session_id = None
+        self.total_fees_usd = 0
         
         # Các biến chung
         self.symbol = None
@@ -103,6 +108,32 @@ class BaseBot:
         """
         # Cập nhật số dư với lợi nhuận
         final_balance = self.balance_service.update_balance_with_profit(self.total_absolute_profit_pct)
+        
+        # Lưu snapshot số dư cuối cùng vào database
+        if self.session_id and self.usd and self.crypto:
+            try:
+                self.db.record_all_balances(self.session_id, self.usd, self.crypto, self.symbol)
+            except Exception as e:
+                log_error(f"Lỗi khi lưu snapshot số dư cuối: {str(e)}")
+        
+        # Kết thúc phiên trong database
+        if self.session_id:
+            try:
+                total_profit_usd = (self.total_absolute_profit_pct / 100) * self.howmuchusd
+                self.db.end_session(
+                    self.session_id,
+                    total_profit_pct=self.total_absolute_profit_pct,
+                    total_profit_usd=total_profit_usd,
+                    total_fees_usd=self.total_fees_usd,
+                    opportunities_found=self.opportunity_count,
+                    trades_executed=getattr(self, 'stats', {}).get('trades_executed', self.opportunity_count),
+                    trades_failed=getattr(self, 'stats', {}).get('failed_trades', 0),
+                    total_volume_usd=getattr(self, 'stats', {}).get('total_volume', 0),
+                    final_balance=final_balance,
+                    status='completed'
+                )
+            except Exception as e:
+                log_error(f"Lỗi khi kết thúc phiên trong database: {str(e)}")
         
         # Gửi thông báo kết thúc phiên
         message = (
@@ -285,6 +316,18 @@ class BaseBot:
         
         # Kiểm tra điều kiện để thực hiện giao dịch
         if self._should_execute_trade(min_ask_ex, max_bid_ex, profit_with_fees_usd, profit_with_fees_pct):
+            # Ghi cơ hội vào database
+            if self.session_id:
+                try:
+                    spread_pct = ((self.max_bid_price - self.min_ask_price) / self.min_ask_price) * 100
+                    self.db.record_opportunity(
+                        self.session_id, self.symbol, min_ask_ex, max_bid_ex,
+                        self.min_ask_price, self.max_bid_price,
+                        spread_pct, profit_with_fees_usd, executed=True
+                    )
+                except Exception as e:
+                    log_error(f"Lỗi khi ghi cơ hội vào database: {str(e)}")
+
             # Thực hiện giao dịch
             await self._execute_trade(min_ask_ex, max_bid_ex, profit_with_fees_pct, profit_with_fees_usd)
             return True
@@ -388,6 +431,22 @@ class BaseBot:
             # Cập nhật tổng lợi nhuận
             self.total_absolute_profit_pct += profit_with_fees_pct
             
+            # Cập nhật tổng phí
+            self.total_fees_usd += fee_usd
+
+            # Ghi giao dịch vào database
+            if self.session_id:
+                try:
+                    cumulative_profit_usd = (self.total_absolute_profit_pct / 100) * self.howmuchusd
+                    self.db.record_trade(
+                        self.session_id, self.opportunity_count, self.symbol,
+                        min_ask_ex, max_bid_ex, self.min_ask_price, self.max_bid_price,
+                        self.crypto_per_transaction, profit_with_fees_pct, profit_with_fees_usd,
+                        fee_usd, fee_crypto, self.total_absolute_profit_pct, cumulative_profit_usd
+                    )
+                except Exception as e:
+                    log_error(f"Lỗi khi ghi giao dịch vào database: {str(e)}")
+
             # Tạo báo cáo giao dịch
             self._display_trade_report(min_ask_ex, max_bid_ex, profit_with_fees_pct, profit_with_fees_usd, fee_usd, fee_crypto)
             

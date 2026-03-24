@@ -22,6 +22,7 @@ from services.exchange_service import ExchangeService
 from services.balance_service import BalanceService
 from services.order_service import OrderService
 from services.notification_service import NotificationService
+from services.database_service import DatabaseService
 
 # Import các bot
 from bots.classic_bot import ClassicBot
@@ -245,6 +246,7 @@ async def run_bot(mode, symbol, usdt_amount, renew_time, exchanges, dry_run=Fals
         balance_service = BalanceService(exchange_service)
         order_service = OrderService(exchange_service)
         notification_service = NotificationService(ENABLE_TELEGRAM)
+        db_service = DatabaseService()
         
         # Log thông tin khởi động
         log_info(f"Khởi động bot với chế độ: {mode}, số tiền: {usdt_amount} USDT, thời gian làm mới: {renew_time} phút")
@@ -262,13 +264,13 @@ async def run_bot(mode, symbol, usdt_amount, renew_time, exchanges, dry_run=Fals
         
         # Khởi tạo bot dựa trên chế độ
         if mode == "fake-money" or dry_run:
-            bot = FakeMoneyBot(exchange_service, balance_service, order_service, notification_service)
+            bot = FakeMoneyBot(exchange_service, balance_service, order_service, notification_service, db_service)
             log_info("Sử dụng bot mô phỏng (không thực hiện giao dịch thực tế)")
         elif mode == "classic":
-            bot = ClassicBot(exchange_service, balance_service, order_service, notification_service)
+            bot = ClassicBot(exchange_service, balance_service, order_service, notification_service, db_service)
             log_info("Sử dụng bot arbitrage cổ điển")
         elif mode == "delta-neutral":
-            bot = DeltaNeutralBot(exchange_service, balance_service, order_service, notification_service)
+            bot = DeltaNeutralBot(exchange_service, balance_service, order_service, notification_service, db_service)
             log_info("Sử dụng bot delta-neutral")
         else:
             log_error(f"Chế độ không hợp lệ: {mode}")

@@ -19,7 +19,7 @@ class ClassicBot(BaseBot):
     Bot giao dịch chênh lệch giá cổ điển, mua ở sàn giá thấp và bán ở sàn giá cao.
     """
     
-    def __init__(self, exchange_service, balance_service, order_service, notification_service):
+    def __init__(self, exchange_service, balance_service, order_service, notification_service, db_service=None):
         """
         Khởi tạo bot giao dịch chênh lệch giá cổ điển.
         
@@ -28,13 +28,15 @@ class ClassicBot(BaseBot):
             balance_service (BalanceService): Dịch vụ quản lý số dư
             order_service (OrderService): Dịch vụ quản lý lệnh
             notification_service (NotificationService): Dịch vụ thông báo
+            db_service (DatabaseService, optional): Dịch vụ cơ sở dữ liệu
         """
         super().__init__(
             exchange_service, 
             balance_service, 
             order_service, 
             notification_service,
-            {'fees': EXCHANGE_FEES}
+            {'fees': EXCHANGE_FEES},
+            db_service
         )
         
         # Thêm biến theo dõi số lần thử lại và thống kê
@@ -63,6 +65,15 @@ class ClassicBot(BaseBot):
         try:
             log_info(f"Bắt đầu phiên giao dịch với tham số: {self.symbol}, {self.exchanges}, {self.howmuchusd} USDT")
             self.start_time = time.time()
+            
+            # Tạo phiên giao dịch trong database
+            try:
+                self.session_id = self.db.create_session(
+                    'classic', self.symbol, self.exchanges,
+                    self.howmuchusd, int(self.timeout - time.time()) // 60
+                )
+            except Exception as e:
+                log_error(f"Lỗi khi tạo phiên trong database: {str(e)}")
             
             # Kiểm tra số dư
             try:
@@ -149,6 +160,14 @@ class ClassicBot(BaseBot):
         except Exception as e:
             log_error(f"Lỗi khi chạy bot: {str(e)}")
             log_debug(f"Chi tiết lỗi: {traceback.format_exc()}")
+            
+            # Ghi lỗi vào database
+            if self.session_id:
+                try:
+                    self.db.record_error('bot_crash', str(e), session_id=self.session_id, details=traceback.format_exc())
+                    self.db.update_session(self.session_id, status='error', error_message=str(e))
+                except Exception:
+                    pass
             
             # Thực hiện bán khẩn cấp nếu có lỗi
             try:
