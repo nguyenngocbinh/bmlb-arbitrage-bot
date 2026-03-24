@@ -19,7 +19,7 @@ Bot giao dịch chênh lệch giá crypto tự động giữa nhiều sàn. Hỗ
 ## Cấu trúc dự án
 
 ```
-aws-arbitrage-bot/
+bmlb-arbitrage-bot/
 ├── main.py                 # Entry point
 ├── configs.py              # Cấu hình: exchanges, fees, risk, paths
 ├── requirements.txt        # Dependencies
@@ -65,8 +65,8 @@ aws-arbitrage-bot/
 ## Cài đặt
 
 ```bash
-git clone https://github.com/nguyenngocbinh/aws-arbitrage-bot.git
-cd aws-arbitrage-bot
+git clone https://github.com/nguyenngocbinh/bmlb-arbitrage-bot.git
+cd bmlb-arbitrage-bot
 pip install -r requirements.txt
 ```
 
@@ -196,9 +196,20 @@ Cấu hình trong `configs.py` → `RISK_CONFIG`:
 
 ## License
 
-MIT License — tự do sử dụng và chỉnh sửa.
+**BMLB Arbitrage Bot License v1.0** — Xem chi tiết tại [LICENSE](LICENSE).
+
+| Đối tượng | Phí |
+|-----------|-----|
+| Cá nhân | Miễn phí |
+| Tổ chức phi lợi nhuận / giáo dục | Miễn phí |
+| Doanh nghiệp (doanh thu < $1M/năm) | Miễn phí |
+| Doanh nghiệp (doanh thu $1M — $10M) | $5,000/năm |
+| Doanh nghiệp (doanh thu $10M — $50M) | $15,000/năm |
+| Doanh nghiệp (doanh thu > $50M) | $30,000/năm |
+
+Copyright (c) 2026 Nguyễn Ngọc Bình. All Rights Reserved.
 
 ## Liên hệ
 
 - GitHub: [nguyenngocbinh](https://github.com/nguyenngocbinh)
-- Issues: Mở issue trên GitHub nếu gặp vấn đề
+- Issues: [Mở issue](https://github.com/nguyenngocbinh/bmlb-arbitrage-bot/issues)

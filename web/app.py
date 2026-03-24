@@ -1,5 +1,5 @@
 """
-FastAPI Web Dashboard cho Arbitrage Bot.
+FastAPI Web Dashboard cho BMLB Arbitrage Bot.
 Cung cấp API REST và giao diện web để theo dõi giao dịch.
 """
 from fastapi import FastAPI, Request, HTTPException, Query
@@ -23,7 +23,7 @@ def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
         FastAPI: App instance
     """
     app = FastAPI(
-        title="Arbitrage Bot Dashboard",
+        title="BMLB Arbitrage Bot Dashboard",
         description="Dashboard theo dõi giao dịch arbitrage crypto",
         version="1.0.0"
     )

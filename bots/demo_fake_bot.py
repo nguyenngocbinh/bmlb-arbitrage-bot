@@ -54,7 +54,7 @@ class FakeMoneyDemo:
     async def run(self):
         """Chạy demo bot."""
         print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-        print(f"{Fore.CYAN}  FAKE MONEY BOT DEMO - Dữ liệu thực từ sàn{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}  BMLB FAKE MONEY DEMO - Dữ liệu thực từ sàn{Style.RESET_ALL}")
         print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
         print(f"  Symbol  : {Fore.YELLOW}{self.symbol}{Style.RESET_ALL}")
         print(f"  Sàn     : {Fore.YELLOW}{', '.join(self.exchange_ids)}{Style.RESET_ALL}")

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Điểm chạy chính của ứng dụng Arbitrage Bot.
+Điểm chạy chính của ứng dụng BMLB Arbitrage Bot.
 """
 import os
 import sys
@@ -77,7 +77,7 @@ def display_banner():
                 ─────╔═╝║──╔═╝║────────────╔═╝║
                 ─────╚══╝──╚══╝────────────╚══╝
     """)
-    print(f"\n{Fore.CYAN}AWS Arbitrage Bot{Style.RESET_ALL} - Giao dịch chênh lệch giá crypto tự động")
+    print(f"\n{Fore.CYAN}BMLB Arbitrage Bot{Style.RESET_ALL} - Giao dịch chênh lệch giá crypto tự động")
     print("\nGithub: nguyenngocbinh\nTwitter: @nanabi88\n")
 
 
@@ -88,7 +88,7 @@ def parse_arguments():
     Returns:
         argparse.Namespace: Đối tượng chứa tham số dòng lệnh
     """
-    parser = argparse.ArgumentParser(description='Arbitrage Bot - Giao dịch chênh lệch giá crypto')
+    parser = argparse.ArgumentParser(description='BMLB Arbitrage Bot - Giao dịch chênh lệch giá crypto')
     
     # Tham số bắt buộc
     parser.add_argument('mode', choices=BOT_MODES, help='Chế độ bot (fake-money, classic, delta-neutral)')

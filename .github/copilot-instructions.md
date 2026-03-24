@@ -1,4 +1,4 @@
-# AWS Arbitrage Bot — Project Guidelines
+# BMLB Arbitrage Bot — Project Guidelines
 
 ## Architecture
 - **Python 3.10+** crypto arbitrage bot chạy trên Windows/Linux
