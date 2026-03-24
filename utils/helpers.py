@@ -6,12 +6,12 @@ from datetime import datetime
 from colorama import Style
 
 
-def show_time():
+def show_time() -> str:
     """Trả về thời gian hiện tại định dạng HH:MM:SS."""
     return time.strftime('%H:%M:%S', time.gmtime(time.time()))
 
 
-def format_message(message):
+def format_message(message: str) -> str:
     """
     Format thông báo để hiển thị đúng định dạng và
     loại bỏ các ký tự đặc biệt của colorama.
@@ -21,19 +21,19 @@ def format_message(message):
     return message
 
 
-def format_log_message(message):
+def format_log_message(message: str) -> str:
     """Format thông báo log với thời gian."""
     return f"{Style.DIM}[{show_time()}]{Style.RESET_ALL} {message}"
 
 
-def calculate_average(values):
+def calculate_average(values: list[float]) -> float:
     """Tính giá trị trung bình của một danh sách số."""
     if not values:
         return 0
     return sum(values) / len(values)
 
 
-def append_to_file(file_path, content, add_newline=True):
+def append_to_file(file_path: str, content: str, add_newline: bool = True) -> bool:
     """Thêm nội dung vào cuối tệp tin."""
     try:
         with open(file_path, 'a+') as file:
@@ -48,7 +48,7 @@ def append_to_file(file_path, content, add_newline=True):
         return False
 
 
-def read_file_content(file_path, default=""):
+def read_file_content(file_path: str, default: str = "") -> str:
     """Đọc nội dung của tệp tin."""
     try:
         with open(file_path, 'r') as file:
@@ -58,7 +58,7 @@ def read_file_content(file_path, default=""):
         return default
 
 
-def update_balance_file(file_path, profit_pct, original_balance):
+def update_balance_file(file_path: str, profit_pct: float, original_balance: float) -> float:
     """Cập nhật tệp tin số dư với lợi nhuận mới."""
     try:
         new_balance = round(original_balance * (1 + (profit_pct / 100)), 3)
@@ -70,7 +70,7 @@ def update_balance_file(file_path, profit_pct, original_balance):
         return original_balance
 
 
-def extract_base_asset(symbol):
+def extract_base_asset(symbol: str) -> str:
     """Trích xuất tên tài sản cơ sở từ một cặp giao dịch."""
     if '/' in symbol:
         return symbol.split('/')[0]

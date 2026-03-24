@@ -7,6 +7,7 @@ from asyncio import gather
 import sys
 import traceback
 
+from typing import Any, Optional
 from utils.logger import log_info, log_error, log_warning, log_debug
 from utils.exceptions import ArbitrageError, ExchangeError, InsufficientBalanceError, OrderError
 from utils.helpers import calculate_average, extract_base_asset
@@ -20,7 +21,9 @@ class DeltaNeutralBot(BaseBot):
     Mua vào tiền điện tử trên các sàn spot và mở vị thế short trên futures.
     """
     
-    def __init__(self, exchange_service, balance_service, order_service, notification_service, db_service=None, risk_config=None):
+    def __init__(self, exchange_service: Any, balance_service: Any, order_service: Any,
+                 notification_service: Any, db_service: Any = None,
+                 risk_config: Optional[dict[str, Any]] = None) -> None:
         """
         Khởi tạo bot giao dịch delta-neutral.
         
@@ -56,7 +59,7 @@ class DeltaNeutralBot(BaseBot):
             'total_volume': 0
         }
     
-    async def start(self):
+    async def start(self) -> float:
         """
         Bắt đầu chạy bot giao dịch delta-neutral.
         
@@ -242,7 +245,7 @@ class DeltaNeutralBot(BaseBot):
                 
             return 0
     
-    async def stop(self):
+    async def stop(self) -> float:
         """
         Dừng bot giao dịch và thực hiện các thao tác dọn dẹp.
         
@@ -285,7 +288,7 @@ class DeltaNeutralBot(BaseBot):
         # Gọi phương thức dừng của lớp cha
         return await super().stop()
     
-    async def _emergency_stop(self):
+    async def _emergency_stop(self) -> None:
         """
         Dừng khẩn cấp bot, bán tất cả crypto và đóng vị thế short.
         
@@ -318,7 +321,7 @@ class DeltaNeutralBot(BaseBot):
         
         return 0
     
-    def _display_stats(self):
+    def _display_stats(self) -> None:
         """Hiển thị thống kê về phiên giao dịch."""
         elapsed_time = time.strftime('%H:%M:%S', time.gmtime(time.time() - self.start_time))
         

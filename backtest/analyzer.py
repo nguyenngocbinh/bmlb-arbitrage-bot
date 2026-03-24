@@ -1,6 +1,7 @@
 """
 Backtest Analyzer - Phân tích và so sánh kết quả backtest.
 """
+from typing import Any, Union
 from backtest.engine import BacktestResult
 
 
@@ -10,7 +11,7 @@ class BacktestAnalyzer:
     """
 
     @staticmethod
-    def analyze(result):
+    def analyze(result: BacktestResult) -> dict[str, Any]:
         """
         Phân tích chi tiết một kết quả backtest.
 
@@ -76,7 +77,7 @@ class BacktestAnalyzer:
         }
 
     @staticmethod
-    def compare(results):
+    def compare(results: list[Union[BacktestResult, dict[str, Any]]]) -> list[dict[str, Any]]:
         """
         So sánh nhiều kết quả backtest.
 
@@ -107,7 +108,7 @@ class BacktestAnalyzer:
         return comparisons
 
     @staticmethod
-    def format_report(result):
+    def format_report(result: BacktestResult) -> str:
         """
         Tạo báo cáo text cho kết quả backtest.
 

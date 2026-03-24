@@ -3,6 +3,7 @@ Multi-pair trading manager - chạy giao dịch đồng thời trên nhiều c�
 """
 import asyncio
 import time
+from typing import Any, Callable, Optional
 from utils.logger import log_info, log_error, log_warning
 
 
@@ -12,8 +13,9 @@ class MultiPairManager:
     Mỗi cặp chạy trong một bot instance riêng.
     """
 
-    def __init__(self, bot_factory, symbols, exchanges, usdt_amount,
-                 renew_time, notification_service=None):
+    def __init__(self, bot_factory: Callable[[], Any], symbols: list[str], exchanges: list[str],
+                 usdt_amount: float, renew_time: int,
+                 notification_service: Any = None) -> None:
         """
         Khởi tạo multi-pair manager.
 
@@ -41,18 +43,18 @@ class MultiPairManager:
         self._running = False
 
     @property
-    def total_profit_pct(self):
+    def total_profit_pct(self) -> float:
         """Tổng lợi nhuận trung bình từ tất cả cặp."""
         if not self._results:
             return 0.0
         return sum(self._results.values()) / len(self._results)
 
     @property
-    def pair_results(self):
+    def pair_results(self) -> dict[str, float]:
         """Kết quả từng cặp."""
         return dict(self._results)
 
-    async def start(self):
+    async def start(self) -> dict[str, float]:
         """
         Bắt đầu giao dịch trên tất cả các cặp đồng thời.
 
@@ -100,7 +102,7 @@ class MultiPairManager:
 
         return self._results
 
-    async def _run_pair(self, symbol):
+    async def _run_pair(self, symbol: str) -> float:
         """
         Chạy bot cho một cặp giao dịch.
 
@@ -129,7 +131,7 @@ class MultiPairManager:
             log_error(f"[{symbol}] Lỗi: {str(e)}")
             return 0.0
 
-    async def stop_all(self):
+    async def stop_all(self) -> None:
         """Dừng tất cả các bot đang chạy."""
         log_info("Đang dừng tất cả các cặp giao dịch...")
         for symbol, bot in self._bots.items():
@@ -139,7 +141,7 @@ class MultiPairManager:
             except Exception as e:
                 log_error(f"[{symbol}] Lỗi khi dừng: {str(e)}")
 
-    def _display_summary(self):
+    def _display_summary(self) -> None:
         """Hiển thị tổng kết multi-pair."""
         log_info("\n" + "=" * 60)
         log_info("TỔNG KẾT MULTI-PAIR TRADING")

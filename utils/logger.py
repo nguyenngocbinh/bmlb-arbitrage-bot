@@ -4,6 +4,7 @@ Module quản lý ghi log của ứng dụng.
 import os
 import logging
 from datetime import datetime
+from typing import Any, Optional
 from colorama import Fore, Style
 from utils.helpers import show_time
 
@@ -30,7 +31,7 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 
-def log_and_print(message, level='info', print_to_console=True, telegram=None):
+def log_and_print(message: str, level: str = 'info', print_to_console: bool = True, telegram: Any = None) -> None:
     """
     Ghi log và hiển thị thông báo ra màn hình console.
     
@@ -53,39 +54,39 @@ def log_and_print(message, level='info', print_to_console=True, telegram=None):
         telegram.send_message(message)
 
 
-def log_debug(message, print_to_console=False, telegram=None):
+def log_debug(message: str, print_to_console: bool = False, telegram: Any = None) -> None:
     """Log và in thông báo debug."""
     log_and_print(message, 'debug', print_to_console, telegram)
 
 
-def log_info(message, print_to_console=True, telegram=None):
+def log_info(message: str, print_to_console: bool = True, telegram: Any = None) -> None:
     """Log và in thông báo thông tin."""
     log_and_print(message, 'info', print_to_console, telegram)
 
 
-def log_warning(message, print_to_console=True, telegram=None):
+def log_warning(message: str, print_to_console: bool = True, telegram: Any = None) -> None:
     """Log và in thông báo cảnh báo."""
     log_and_print(f"{Fore.YELLOW}{message}{Style.RESET_ALL}", 'warning', print_to_console, telegram)
 
 
-def log_error(message, print_to_console=True, telegram=None):
+def log_error(message: str, print_to_console: bool = True, telegram: Any = None) -> None:
     """Log và in thông báo lỗi."""
     log_and_print(f"{Fore.RED}{message}{Style.RESET_ALL}", 'error', print_to_console, telegram)
 
 
-def log_critical(message, print_to_console=True, telegram=None):
+def log_critical(message: str, print_to_console: bool = True, telegram: Any = None) -> None:
     """Log và in thông báo lỗi nghiêm trọng."""
     log_and_print(f"{Fore.RED}{Style.BRIGHT}{message}{Style.RESET_ALL}", 'critical', print_to_console, telegram)
 
 
-def log_profit(message, profit_pct, profit_usd, print_to_console=True, telegram=None):
+def log_profit(message: str, profit_pct: float, profit_usd: float, print_to_console: bool = True, telegram: Any = None) -> None:
     """Log và in thông báo về lợi nhuận."""
     color = Fore.GREEN if profit_usd > 0 else (Fore.RED if profit_usd < 0 else Fore.WHITE)
     formatted_message = f"{message}: {color}+{round(profit_pct, 4)}% (+{round(profit_usd, 4)} USD){Style.RESET_ALL}"
     log_and_print(formatted_message, 'info', print_to_console, telegram)
 
 
-def log_opportunity(index, min_ask_ex, min_ask_price, max_bid_ex, max_bid_price, profit_with_fees_pct, profit_with_fees_usd, print_to_console=True, telegram=None):
+def log_opportunity(index: int, min_ask_ex: str, min_ask_price: float, max_bid_ex: str, max_bid_price: float, profit_with_fees_pct: float, profit_with_fees_usd: float, print_to_console: bool = True, telegram: Any = None) -> None:
     """Log và in thông báo về cơ hội giao dịch."""
     message = (
         f"Opportunity #{index} detected! "

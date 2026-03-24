@@ -9,6 +9,7 @@ import os
 import random
 from contextlib import contextmanager
 from datetime import datetime
+from typing import Any, Generator, Optional
 
 from utils.logger import log_info, log_error
 
@@ -18,7 +19,7 @@ class DataRecorder:
     Ghi dữ liệu orderbook real-time vào SQLite để dùng cho backtest.
     """
 
-    def __init__(self, db_path=None):
+    def __init__(self, db_path: Optional[str] = None) -> None:
         """
         Khởi tạo data recorder.
 
@@ -35,7 +36,7 @@ class DataRecorder:
         self._initialize_database()
 
     @contextmanager
-    def _get_connection(self):
+    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         """Context manager cho database connection."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -49,7 +50,7 @@ class DataRecorder:
         finally:
             conn.close()
 
-    def _initialize_database(self):
+    def _initialize_database(self) -> None:
         """Tạo bảng lưu trữ dữ liệu orderbook."""
         with self._get_connection() as conn:
             conn.execute("""
@@ -86,8 +87,9 @@ class DataRecorder:
                 )
             """)
 
-    def record_snapshot(self, timestamp, symbol, exchange, best_bid, best_ask,
-                        bid_volume=None, ask_volume=None):
+    def record_snapshot(self, timestamp: float, symbol: str, exchange: str, best_bid: float,
+                        best_ask: float, bid_volume: Optional[float] = None,
+                        ask_volume: Optional[float] = None) -> None:
         """
         Ghi một snapshot orderbook.
 
@@ -107,7 +109,7 @@ class DataRecorder:
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (timestamp, symbol, exchange, best_bid, best_ask, bid_volume, ask_volume))
 
-    def record_batch(self, snapshots):
+    def record_batch(self, snapshots: list[dict[str, Any]]) -> None:
         """
         Ghi nhiều snapshot cùng lúc (hiệu quả hơn).
 
@@ -126,7 +128,7 @@ class DataRecorder:
                 for s in snapshots
             ])
 
-    def start_recording_session(self, symbol, exchanges):
+    def start_recording_session(self, symbol: str, exchanges: list[str]) -> int:
         """
         Bắt đầu phiên ghi dữ liệu.
 
@@ -144,7 +146,7 @@ class DataRecorder:
             """, (symbol, json.dumps(exchanges), datetime.now().isoformat()))
             return cursor.lastrowid
 
-    def end_recording_session(self, session_id, snapshot_count):
+    def end_recording_session(self, session_id: int, snapshot_count: int) -> None:
         """
         Kết thúc phiên ghi dữ liệu.
 
@@ -159,7 +161,8 @@ class DataRecorder:
                 WHERE id = ?
             """, (datetime.now().isoformat(), snapshot_count, session_id))
 
-    def get_snapshots(self, symbol, exchanges=None, start_time=None, end_time=None):
+    def get_snapshots(self, symbol: str, exchanges: Optional[list[str]] = None,
+                      start_time: Optional[float] = None, end_time: Optional[float] = None) -> list[dict[str, Any]]:
         """
         Lấy dữ liệu snapshot theo điều kiện.
 
@@ -194,7 +197,7 @@ class DataRecorder:
             rows = conn.execute(query, params).fetchall()
             return [dict(row) for row in rows]
 
-    def get_recording_sessions(self):
+    def get_recording_sessions(self) -> list[dict[str, Any]]:
         """
         Lấy danh sách các phiên ghi dữ liệu.
 
@@ -207,7 +210,7 @@ class DataRecorder:
             ).fetchall()
             return [dict(row) for row in rows]
 
-    def get_snapshot_count(self, symbol=None):
+    def get_snapshot_count(self, symbol: Optional[str] = None) -> int:
         """
         Đếm số snapshot.
 
@@ -226,9 +229,9 @@ class DataRecorder:
         with self._get_connection() as conn:
             return conn.execute(query, params).fetchone()[0]
 
-    def generate_synthetic_data(self, symbol, exchanges, duration_minutes=60,
-                                interval_seconds=1, base_price=50000,
-                                spread_bps=5, volatility_bps=10):
+    def generate_synthetic_data(self, symbol: str, exchanges: list[str], duration_minutes: int = 60,
+                                interval_seconds: float = 1, base_price: float = 50000,
+                                spread_bps: float = 5, volatility_bps: float = 10) -> int:
         """
         Tạo dữ liệu orderbook giả lập cho backtest.
 

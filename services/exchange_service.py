@@ -6,6 +6,7 @@ import ccxt
 import ccxt.pro
 import asyncio
 from datetime import datetime
+from typing import Any, Optional
 from dotenv import load_dotenv
 from utils.logger import log_info, log_error, log_debug
 from utils.exceptions import ExchangeError, InsufficientBalanceError, FuturesError
@@ -21,14 +22,14 @@ class ExchangeService:
     Lớp dịch vụ tương tác với các sàn giao dịch cryptocurrency.
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Khởi tạo dịch vụ sàn giao dịch."""
         self.exchanges = {}
         self.exchange_instances = {}
         self._rate_limiter = get_rate_limiter()
         self._initialize_exchanges()
     
-    def _initialize_exchanges(self):
+    def _initialize_exchanges(self) -> None:
         """Khởi tạo đối tượng sàn giao dịch với thông tin xác thực từ biến môi trường."""
         # Khởi tạo Binance
         if os.getenv('BINANCE_API_KEY') and os.getenv('BINANCE_SECRET'):
@@ -72,7 +73,7 @@ class ExchangeService:
                 'options': {'createMarketBuyOrderRequiresPrice': False}
             }
     
-    def get_exchange(self, exchange_id):
+    def get_exchange(self, exchange_id: str) -> Any:
         """
         Lấy đối tượng sàn giao dịch theo id.
         
@@ -99,7 +100,7 @@ class ExchangeService:
         
         return self.exchange_instances[exchange_id]
 
-    async def get_pro_exchange(self, exchange_id):
+    async def get_pro_exchange(self, exchange_id: str) -> Any:
         """
         Lấy đối tượng sàn giao dịch ccxt.pro theo id.
         
@@ -122,7 +123,7 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể khởi tạo sàn giao dịch pro: {str(e)}")
     
-    def get_balance(self, exchange_id, symbol):
+    def get_balance(self, exchange_id: str, symbol: str) -> dict[str, float]:
         """
         Lấy số dư của một tài sản trên sàn giao dịch.
         
@@ -150,7 +151,7 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể lấy số dư của {symbol}: {str(e)}")
     
-    def get_ticker(self, exchange_id, symbol):
+    def get_ticker(self, exchange_id: str, symbol: str) -> dict[str, Any]:
         """
         Lấy thông tin ticker của một cặp giao dịch.
         
@@ -171,7 +172,8 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể lấy ticker cho {symbol}: {str(e)}")
     
-    def create_limit_buy_order(self, exchange_id, symbol, amount, price):
+    def create_limit_buy_order(self, exchange_id: str, symbol: str, amount: float,
+                                price: float) -> dict[str, Any]:
         """
         Tạo lệnh mua giới hạn.
         
@@ -194,7 +196,8 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể tạo lệnh mua giới hạn cho {symbol}: {str(e)}")
     
-    def create_limit_sell_order(self, exchange_id, symbol, amount, price):
+    def create_limit_sell_order(self, exchange_id: str, symbol: str, amount: float,
+                                 price: float) -> dict[str, Any]:
         """
         Tạo lệnh bán giới hạn.
         
@@ -217,7 +220,8 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể tạo lệnh bán giới hạn cho {symbol}: {str(e)}")
     
-    def create_market_buy_order(self, exchange_id, symbol, amount, params=None):
+    def create_market_buy_order(self, exchange_id: str, symbol: str, amount: float,
+                                 params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         """
         Tạo lệnh mua thị trường.
         
@@ -241,7 +245,8 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể tạo lệnh mua thị trường cho {symbol}: {str(e)}")
     
-    def create_market_sell_order(self, exchange_id, symbol, amount, params=None):
+    def create_market_sell_order(self, exchange_id: str, symbol: str, amount: float,
+                                  params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         """
         Tạo lệnh bán thị trường.
         
@@ -265,7 +270,7 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể tạo lệnh bán thị trường cho {symbol}: {str(e)}")
     
-    def fetch_open_orders(self, exchange_id, symbol):
+    def fetch_open_orders(self, exchange_id: str, symbol: str) -> list[dict[str, Any]]:
         """
         Lấy danh sách lệnh đang mở.
         
@@ -286,7 +291,7 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể lấy danh sách lệnh đang mở cho {symbol}: {str(e)}")
     
-    def fetch_closed_orders(self, exchange_id, symbol):
+    def fetch_closed_orders(self, exchange_id: str, symbol: str) -> list[dict[str, Any]]:
         """
         Lấy danh sách lệnh đã đóng.
         
@@ -307,7 +312,7 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể lấy danh sách lệnh đã đóng cho {symbol}: {str(e)}")
     
-    def cancel_order(self, exchange_id, order_id, symbol):
+    def cancel_order(self, exchange_id: str, order_id: str, symbol: str) -> dict[str, Any]:
         """
         Hủy một lệnh.
         
@@ -329,7 +334,7 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể hủy lệnh {order_id} cho {symbol}: {str(e)}")
     
-    def cancel_all_orders(self, exchange_id, symbol):
+    def cancel_all_orders(self, exchange_id: str, symbol: str) -> None:
         """
         Hủy tất cả các lệnh đang mở.
         
@@ -358,7 +363,7 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể hủy tất cả lệnh cho {symbol}: {str(e)}")
     
-    def get_precision_min(self, exchange_id, symbol):
+    def get_precision_min(self, exchange_id: str, symbol: str) -> tuple[float, float, float]:
         """
         Lấy giá trị tối thiểu của giá cho một cặp giao dịch.
         
@@ -386,7 +391,7 @@ class ExchangeService:
             log_error(f"Không thể lấy giá trị tối thiểu cho {symbol} trên {exchange_id}: {str(e)}")
             return 0.001
     
-    async def get_global_average_price(self, exchanges, symbol):
+    async def get_global_average_price(self, exchanges: list[str], symbol: str) -> float:
         """
         Lấy giá trung bình của một cặp giao dịch trên nhiều sàn.
         
@@ -415,7 +420,7 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError("global", f"Không thể lấy giá trung bình: {str(e)}")
     
-    async def watch_order_book(self, exchange_id, symbol):
+    async def watch_order_book(self, exchange_id: str, symbol: str) -> dict[str, Any]:
         """
         Theo dõi sách lệnh của một cặp giao dịch.
         
@@ -436,7 +441,7 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể theo dõi sách lệnh cho {symbol}: {str(e)}")
     
-    def emergency_convert(self, exchange_id, symbol, keep_percentage=0.01):
+    def emergency_convert(self, exchange_id: str, symbol: str, keep_percentage: float = 0.01) -> None:
         """
         Chuyển đổi khẩn cấp một tài sản sang USDT.
         
@@ -472,7 +477,8 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể thực hiện chuyển đổi khẩn cấp cho {symbol}: {str(e)}")
     
-    def transfer_between_accounts(self, exchange_id, asset, amount, from_account, to_account):
+    def transfer_between_accounts(self, exchange_id: str, asset: str, amount: float,
+                                    from_account: str, to_account: str) -> bool:
         """
         Chuyển tiền giữa các tài khoản trên cùng một sàn giao dịch.
         
@@ -498,7 +504,8 @@ class ExchangeService:
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể chuyển tiền: {str(e)}")
     
-    def create_futures_order(self, exchange_id, symbol, type, side, amount, params=None):
+    def create_futures_order(self, exchange_id: str, symbol: str, type: str, side: str,
+                              amount: float, params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         """
         Tạo lệnh trên thị trường futures.
         
@@ -548,7 +555,7 @@ class ExchangeService:
     # ─── Async Methods ────────────────────────────────────────────────
     # Các phương thức async sử dụng ccxt.pro cho đặt lệnh đồng thời
 
-    async def _get_or_create_pro_exchange(self, exchange_id):
+    async def _get_or_create_pro_exchange(self, exchange_id: str) -> Any:
         """
         Lấy hoặc tạo đối tượng sàn giao dịch ccxt.pro dùng lại được.
         

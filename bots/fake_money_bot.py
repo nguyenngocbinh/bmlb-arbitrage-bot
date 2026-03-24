@@ -4,6 +4,7 @@ Bot mô phỏng giao dịch với tiền ảo, không thực hiện giao dịch 
 import time
 import asyncio
 from asyncio import gather
+from typing import Any, Optional
 import ccxt.pro
 
 from utils.logger import log_info, log_error, log_warning
@@ -18,7 +19,9 @@ class FakeMoneyBot(BaseBot):
     Bot mô phỏng giao dịch với tiền ảo, không thực hiện giao dịch thực tế.
     """
     
-    def __init__(self, exchange_service, balance_service, order_service, notification_service, db_service=None, risk_config=None):
+    def __init__(self, exchange_service: Any, balance_service: Any, order_service: Any,
+                 notification_service: Any, db_service: Any = None,
+                 risk_config: Optional[dict[str, Any]] = None) -> None:
         """
         Khởi tạo bot mô phỏng.
         
@@ -40,7 +43,7 @@ class FakeMoneyBot(BaseBot):
             risk_config or RISK_CONFIG
         )
     
-    async def start(self):
+    async def start(self) -> float:
         """
         Bắt đầu chạy bot mô phỏng.
         
@@ -91,7 +94,7 @@ class FakeMoneyBot(BaseBot):
             log_error(f"Lỗi khi chạy bot mô phỏng: {str(e)}")
             return 0
     
-    async def _start_orderbook_loop(self):
+    async def _start_orderbook_loop(self) -> float:
         """
         Bắt đầu vòng lặp theo dõi sách lệnh trên tất cả các sàn.
         
@@ -114,7 +117,7 @@ class FakeMoneyBot(BaseBot):
             log_error(f"Lỗi trong vòng lặp theo dõi sách lệnh: {str(e)}")
             raise
     
-    async def _exchange_loop(self, exchange_id):
+    async def _exchange_loop(self, exchange_id: str) -> None:
         """
         Vòng lặp theo dõi sách lệnh cho một sàn giao dịch cụ thể.
         
@@ -147,7 +150,8 @@ class FakeMoneyBot(BaseBot):
         except Exception as e:
             log_error(f"Lỗi khi khởi tạo vòng lặp cho {exchange_id}: {str(e)}")
     
-    async def _execute_trade(self, min_ask_ex, max_bid_ex, profit_with_fees_pct, profit_with_fees_usd):
+    async def _execute_trade(self, min_ask_ex: str, max_bid_ex: str,
+                             profit_with_fees_pct: float, profit_with_fees_usd: float) -> None:
         """
         Thực hiện giao dịch mô phỏng (không gửi lệnh thực tế).
         
@@ -196,7 +200,7 @@ class FakeMoneyBot(BaseBot):
             log_error(f"Lỗi khi thực hiện giao dịch mô phỏng: {str(e)}")
             return False
     
-    async def stop(self):
+    async def stop(self) -> float:
         """
         Dừng bot mô phỏng.
         

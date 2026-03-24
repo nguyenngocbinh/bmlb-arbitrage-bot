@@ -3,6 +3,7 @@ Service quản lý các hoạt động đặt lệnh giao dịch.
 """
 import time
 import asyncio
+from typing import Any, Optional
 from utils.logger import log_info, log_error, log_warning
 from utils.exceptions import OrderError, OrderFillTimeoutError, FuturesError
 from configs import FIRST_ORDERS_FILL_TIMEOUT
@@ -14,7 +15,7 @@ class OrderService:
     Lớp dịch vụ quản lý các lệnh giao dịch.
     """
     
-    def __init__(self, exchange_service):
+    def __init__(self, exchange_service: Any) -> None:
         """
         Khởi tạo dịch vụ quản lý lệnh.
         
@@ -23,7 +24,8 @@ class OrderService:
         """
         self.exchange_service = exchange_service
     
-    def place_initial_orders(self, exchanges, symbol, amount_per_exchange, price, notification_service=None):
+    def place_initial_orders(self, exchanges: list[str], symbol: str, amount_per_exchange: float,
+                             price: float, notification_service: Any = None) -> bool:
         """
         Đặt các lệnh mua ban đầu.
         
@@ -111,7 +113,9 @@ class OrderService:
         
         return True
     
-    def place_arbitrage_orders(self, min_ask_ex, max_bid_ex, symbol, amount, min_ask_price, max_bid_price, notification_service=None):
+    def place_arbitrage_orders(self, min_ask_ex: str, max_bid_ex: str, symbol: str,
+                               amount: float, min_ask_price: float, max_bid_price: float,
+                               notification_service: Any = None) -> bool:
         """
         Đặt các lệnh giao dịch chênh lệch giá.
         
@@ -227,7 +231,7 @@ class OrderService:
         except Exception as e:
             raise OrderError(f"{min_ask_ex}/{max_bid_ex}", "arbitrage", str(e))
     
-    def emergency_sell(self, symbol, exchanges):
+    def emergency_sell(self, symbol: str, exchanges: list[str]) -> bool:
         """
         Bán khẩn cấp tiền mã hóa trên các sàn.
         
@@ -246,7 +250,8 @@ class OrderService:
         
         return True
     
-    def place_futures_short_order(self, exchange_id, symbol, amount, leverage=1):
+    def place_futures_short_order(self, exchange_id: str, symbol: str, amount: float,
+                                   leverage: int = 1) -> dict[str, Any]:
         """
         Đặt lệnh Short trên thị trường Futures.
         
@@ -276,7 +281,8 @@ class OrderService:
         except Exception as e:
             raise FuturesError(exchange_id, f"Không thể đặt lệnh short: {str(e)}")
     
-    def close_futures_short_order(self, exchange_id, symbol, amount, leverage=1):
+    def close_futures_short_order(self, exchange_id: str, symbol: str, amount: float,
+                                    leverage: int = 1) -> dict[str, Any]:
         """
         Đóng lệnh Short trên thị trường Futures.
         
@@ -306,7 +312,7 @@ class OrderService:
         except Exception as e:
             raise FuturesError(exchange_id, f"Không thể đóng lệnh short: {str(e)}")
     
-    def wait_for_futures_order_fill(self, exchange_id, symbol, timeout=120):
+    def wait_for_futures_order_fill(self, exchange_id: str, symbol: str, timeout: int = 120) -> bool:
         """
         Đợi cho đến khi lệnh Futures được điền.
         
@@ -358,7 +364,7 @@ class OrderService:
             
             raise FuturesError(exchange_id, f"Lỗi khi đợi lệnh futures được điền: {str(e)}")
     
-    def set_futures_leverage(self, exchange_id, symbol, leverage):
+    def set_futures_leverage(self, exchange_id: str, symbol: str, leverage: int) -> Optional[dict[str, Any]]:
         """
         Thiết lập đòn bẩy cho một cặp giao dịch trên thị trường Futures.
         
@@ -390,7 +396,7 @@ class OrderService:
         except Exception as e:
             raise FuturesError(exchange_id, f"Không thể thiết lập đòn bẩy: {str(e)}")
     
-    def check_futures_position(self, exchange_id, symbol):
+    def check_futures_position(self, exchange_id: str, symbol: str) -> Optional[dict[str, Any]]:
         """
         Kiểm tra vị thế Futures hiện tại.
         
@@ -428,7 +434,7 @@ class OrderService:
         except Exception as e:
             raise FuturesError(exchange_id, f"Không thể kiểm tra vị thế: {str(e)}")
             
-    def get_futures_balance(self, exchange_id, asset='USDT'):
+    def get_futures_balance(self, exchange_id: str, asset: str = 'USDT') -> float:
         """
         Lấy số dư trên tài khoản Futures.
         

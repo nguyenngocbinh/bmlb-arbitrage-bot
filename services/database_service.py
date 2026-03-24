@@ -6,6 +6,7 @@ import sqlite3
 import time
 from datetime import datetime, timezone
 from contextlib import contextmanager
+from typing import Any, Generator, Optional
 from utils.logger import log_info, log_error, log_debug
 
 
@@ -19,7 +20,7 @@ class DatabaseService:
     Lưu trữ lịch sử giao dịch, phiên, cơ hội, và số dư.
     """
 
-    def __init__(self, db_path=None):
+    def __init__(self, db_path: Optional[str] = None) -> None:
         """
         Khởi tạo dịch vụ cơ sở dữ liệu.
 
@@ -36,7 +37,7 @@ class DatabaseService:
         self._initialize_database()
 
     @contextmanager
-    def _get_connection(self):
+    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         """
         Context manager để lấy kết nối database.
 
@@ -56,7 +57,7 @@ class DatabaseService:
         finally:
             conn.close()
 
-    def _initialize_database(self):
+    def _initialize_database(self) -> None:
         """Tạo các bảng cần thiết nếu chưa tồn tại."""
         with self._get_connection() as conn:
             conn.executescript("""
@@ -158,7 +159,8 @@ class DatabaseService:
 
     # ─── Session Management ───────────────────────────────────────────
 
-    def create_session(self, mode, symbol, exchanges, usdt_amount, renew_time_minutes):
+    def create_session(self, mode: str, symbol: str, exchanges: list[str],
+                       usdt_amount: float, renew_time_minutes: int) -> int:
         """
         Tạo một phiên giao dịch mới.
 
@@ -184,7 +186,7 @@ class DatabaseService:
             log_info(f"Đã tạo phiên giao dịch #{session_id}")
             return session_id
 
-    def update_session(self, session_id, **kwargs):
+    def update_session(self, session_id: int, **kwargs: Any) -> None:
         """
         Cập nhật thông tin phiên giao dịch.
 
@@ -210,7 +212,7 @@ class DatabaseService:
                 values
             )
 
-    def end_session(self, session_id, total_profit_pct, total_profit_usd,
+    def end_session(self, session_id: int, total_profit_pct: float, total_profit_usd: float,
                     total_fees_usd, opportunities_found, trades_executed,
                     trades_failed, total_volume_usd, final_balance, status='completed'):
         """
@@ -243,7 +245,7 @@ class DatabaseService:
         )
         log_info(f"Phiên giao dịch #{session_id} đã kết thúc. Trạng thái: {status}")
 
-    def get_session(self, session_id):
+    def get_session(self, session_id: int) -> Optional[dict[str, Any]]:
         """
         Lấy thông tin chi tiết phiên giao dịch.
 
@@ -259,7 +261,8 @@ class DatabaseService:
             ).fetchone()
             return dict(row) if row else None
 
-    def get_all_sessions(self, limit=50, offset=0, status=None, symbol=None):
+    def get_all_sessions(self, limit: int = 50, offset: int = 0,
+                         status: Optional[str] = None, symbol: Optional[str] = None) -> list[dict[str, Any]]:
         """
         Lấy danh sách phiên giao dịch với phân trang và bộ lọc.
 
@@ -291,7 +294,7 @@ class DatabaseService:
 
     # ─── Trade Management ─────────────────────────────────────────────
 
-    def record_trade(self, session_id, trade_number, symbol, buy_exchange,
+    def record_trade(self, session_id: int, trade_number: int, symbol: str, buy_exchange: str,
                      sell_exchange, buy_price, sell_price, amount, profit_pct,
                      profit_usd, fee_usd, fee_crypto, cumulative_profit_pct,
                      cumulative_profit_usd, status='executed',
@@ -348,7 +351,7 @@ class DatabaseService:
             )
             return cursor.lastrowid
 
-    def get_trades_by_session(self, session_id, limit=100, offset=0):
+    def get_trades_by_session(self, session_id: int, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         """
         Lấy danh sách giao dịch của một phiên.
 
@@ -368,7 +371,7 @@ class DatabaseService:
             ).fetchall()
             return [dict(row) for row in rows]
 
-    def get_all_trades(self, limit=100, offset=0, symbol=None,
+    def get_all_trades(self, limit: int = 100, offset: int = 0, symbol: Optional[str] = None,
                        buy_exchange=None, sell_exchange=None,
                        start_date=None, end_date=None):
         """
@@ -414,7 +417,7 @@ class DatabaseService:
 
     # ─── Opportunity Management ───────────────────────────────────────
 
-    def record_opportunity(self, session_id, symbol, buy_exchange, sell_exchange,
+    def record_opportunity(self, session_id: int, symbol: str, buy_exchange: str, sell_exchange: str,
                            buy_price, sell_price, spread_pct, estimated_profit_usd,
                            executed=False):
         """
@@ -446,7 +449,8 @@ class DatabaseService:
             )
             return cursor.lastrowid
 
-    def get_opportunities_by_session(self, session_id, executed_only=False, limit=100):
+    def get_opportunities_by_session(self, session_id: int, executed_only: bool = False,
+                                      limit: int = 100) -> list[dict[str, Any]]:
         """
         Lấy danh sách cơ hội của một phiên.
 
@@ -473,7 +477,7 @@ class DatabaseService:
 
     # ─── Balance Snapshot Management ──────────────────────────────────
 
-    def record_balance_snapshot(self, session_id, exchange, usdt_balance,
+    def record_balance_snapshot(self, session_id: int, exchange: str, usdt_balance: float,
                                 crypto_balance, crypto_symbol):
         """
         Ghi lại snapshot số dư.
@@ -498,7 +502,8 @@ class DatabaseService:
             )
             return cursor.lastrowid
 
-    def record_all_balances(self, session_id, usd_balances, crypto_balances, symbol):
+    def record_all_balances(self, session_id: int, usd_balances: dict[str, float],
+                            crypto_balances: dict[str, float], symbol: str) -> None:
         """
         Ghi lại snapshot số dư cho tất cả sàn.
 
@@ -524,7 +529,7 @@ class DatabaseService:
                      crypto_symbol)
                 )
 
-    def get_balance_history(self, session_id, exchange=None):
+    def get_balance_history(self, session_id: int, exchange: Optional[str] = None) -> list[dict[str, Any]]:
         """
         Lấy lịch sử số dư.
 
@@ -550,7 +555,7 @@ class DatabaseService:
 
     # ─── Error Log ────────────────────────────────────────────────────
 
-    def record_error(self, error_type, message, exchange=None,
+    def record_error(self, error_type: str, message: str, exchange: Optional[str] = None,
                      session_id=None, details=None):
         """
         Ghi lại lỗi.
@@ -571,7 +576,8 @@ class DatabaseService:
                  error_type, exchange, message, details)
             )
 
-    def get_errors(self, session_id=None, error_type=None, limit=100):
+    def get_errors(self, session_id: Optional[int] = None, error_type: Optional[str] = None,
+                   limit: int = 100) -> list[dict[str, Any]]:
         """
         Lấy danh sách lỗi.
 
@@ -602,7 +608,7 @@ class DatabaseService:
 
     # ─── Statistics & Analytics ───────────────────────────────────────
 
-    def get_overall_stats(self):
+    def get_overall_stats(self) -> dict[str, Any]:
         """
         Lấy thống kê tổng hợp tất cả phiên.
 
@@ -641,7 +647,7 @@ class DatabaseService:
                 **dict(trade_stats)
             }
 
-    def get_profit_by_exchange_pair(self):
+    def get_profit_by_exchange_pair(self) -> list[dict[str, Any]]:
         """
         Lấy lợi nhuận theo cặp sàn giao dịch.
 
@@ -662,7 +668,7 @@ class DatabaseService:
             """).fetchall()
             return [dict(row) for row in rows]
 
-    def get_profit_by_symbol(self):
+    def get_profit_by_symbol(self) -> list[dict[str, Any]]:
         """
         Lấy lợi nhuận theo cặp giao dịch.
 
@@ -684,7 +690,7 @@ class DatabaseService:
             """).fetchall()
             return [dict(row) for row in rows]
 
-    def get_hourly_profit(self, session_id=None, days=7):
+    def get_hourly_profit(self, session_id: Optional[int] = None, days: int = 7) -> list[dict[str, Any]]:
         """
         Lấy lợi nhuận theo giờ.
 
@@ -717,7 +723,7 @@ class DatabaseService:
             rows = conn.execute(query, params).fetchall()
             return [dict(row) for row in rows]
 
-    def get_daily_profit(self, days=30):
+    def get_daily_profit(self, days: int = 30) -> list[dict[str, Any]]:
         """
         Lấy lợi nhuận theo ngày.
 
@@ -743,7 +749,7 @@ class DatabaseService:
             """, (f'-{days} days',)).fetchall()
             return [dict(row) for row in rows]
 
-    def get_exchange_performance(self):
+    def get_exchange_performance(self) -> list[dict[str, Any]]:
         """
         Lấy hiệu suất theo từng sàn giao dịch.
 
@@ -782,7 +788,7 @@ class DatabaseService:
 
     # ─── Slippage Analytics ───────────────────────────────────────────
 
-    def get_slippage_stats(self, session_id=None):
+    def get_slippage_stats(self, session_id: Optional[int] = None) -> dict[str, Any]:
         """
         Lấy thống kê slippage tổng hợp.
 
@@ -813,7 +819,7 @@ class DatabaseService:
             """, params).fetchone()
             return dict(row)
 
-    def get_slippage_by_exchange(self, session_id=None):
+    def get_slippage_by_exchange(self, session_id: Optional[int] = None) -> list[dict[str, Any]]:
         """
         Lấy thống kê slippage theo sàn giao dịch.
 

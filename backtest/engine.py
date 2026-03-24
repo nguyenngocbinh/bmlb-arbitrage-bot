@@ -3,6 +3,7 @@ Backtest Engine - Replay dữ liệu orderbook lịch sử để mô phỏng gia
 """
 import time
 from collections import defaultdict
+from typing import Any, Optional, Union
 
 from backtest.data_recorder import DataRecorder
 from configs import EXCHANGE_FEES, PROFIT_CRITERIA_PCT, PROFIT_CRITERIA_USD
@@ -14,42 +15,42 @@ class BacktestResult:
     Kết quả của một lần backtest.
     """
 
-    def __init__(self):
-        self.trades = []
-        self.opportunities = []
-        self.equity_curve = []
-        self.config = {}
-        self.start_time = None
-        self.end_time = None
+    def __init__(self) -> None:
+        self.trades: list[dict[str, Any]] = []
+        self.opportunities: list[dict[str, Any]] = []
+        self.equity_curve: list[float] = []
+        self.config: dict[str, Any] = {}
+        self.start_time: Optional[float] = None
+        self.end_time: Optional[float] = None
 
     @property
-    def total_trades(self):
+    def total_trades(self) -> int:
         return len(self.trades)
 
     @property
-    def winning_trades(self):
+    def winning_trades(self) -> int:
         return len([t for t in self.trades if t['profit_usd'] > 0])
 
     @property
-    def losing_trades(self):
+    def losing_trades(self) -> int:
         return len([t for t in self.trades if t['profit_usd'] <= 0])
 
     @property
-    def win_rate(self):
+    def win_rate(self) -> float:
         if self.total_trades == 0:
             return 0
         return self.winning_trades / self.total_trades * 100
 
     @property
-    def total_profit_usd(self):
+    def total_profit_usd(self) -> float:
         return sum(t['profit_usd'] for t in self.trades)
 
     @property
-    def total_profit_pct(self):
+    def total_profit_pct(self) -> float:
         return sum(t['profit_pct'] for t in self.trades)
 
     @property
-    def max_drawdown_pct(self):
+    def max_drawdown_pct(self) -> float:
         if not self.equity_curve:
             return 0
         peak = self.equity_curve[0]
@@ -63,7 +64,7 @@ class BacktestResult:
         return max_dd
 
     @property
-    def sharpe_ratio(self):
+    def sharpe_ratio(self) -> float:
         """Sharpe ratio đơn giản (không risk-free rate)."""
         if len(self.trades) < 2:
             return 0
@@ -76,36 +77,36 @@ class BacktestResult:
         return mean / std
 
     @property
-    def avg_profit_per_trade_usd(self):
+    def avg_profit_per_trade_usd(self) -> float:
         if self.total_trades == 0:
             return 0
         return self.total_profit_usd / self.total_trades
 
     @property
-    def best_trade_usd(self):
+    def best_trade_usd(self) -> float:
         if not self.trades:
             return 0
         return max(t['profit_usd'] for t in self.trades)
 
     @property
-    def worst_trade_usd(self):
+    def worst_trade_usd(self) -> float:
         if not self.trades:
             return 0
         return min(t['profit_usd'] for t in self.trades)
 
     @property
-    def total_fees_usd(self):
+    def total_fees_usd(self) -> float:
         return sum(t['fee_usd'] for t in self.trades)
 
     @property
-    def profit_factor(self):
+    def profit_factor(self) -> float:
         gross_profit = sum(t['profit_usd'] for t in self.trades if t['profit_usd'] > 0)
         gross_loss = abs(sum(t['profit_usd'] for t in self.trades if t['profit_usd'] < 0))
         if gross_loss == 0:
             return float('inf') if gross_profit > 0 else 0
         return gross_profit / gross_loss
 
-    def summary(self):
+    def summary(self) -> dict[str, Any]:
         """
         Tạo tóm tắt kết quả backtest.
 
@@ -136,7 +137,7 @@ class BacktestEngine:
     Engine chạy backtest trên dữ liệu orderbook lịch sử.
     """
 
-    def __init__(self, data_recorder=None):
+    def __init__(self, data_recorder: Optional[DataRecorder] = None) -> None:
         """
         Khởi tạo backtest engine.
 
@@ -145,7 +146,7 @@ class BacktestEngine:
         """
         self.data_recorder = data_recorder or DataRecorder()
 
-    def run(self, symbol, exchanges, initial_balance_usd=1000,
+    def run(self, symbol: str, exchanges: list[str], initial_balance_usd: float = 1000,
             fee_config=None, profit_threshold_usd=None, profit_threshold_pct=None,
             slippage_bps=0, cooldown_seconds=0, start_time=None, end_time=None):
         """
@@ -349,7 +350,7 @@ class BacktestEngine:
 
         return result
 
-    def run_parameter_sweep(self, symbol, exchanges, initial_balance_usd=1000,
+    def run_parameter_sweep(self, symbol: str, exchanges: list[str], initial_balance_usd: float = 1000,
                             fee_config=None, slippage_range=None,
                             profit_threshold_range=None, cooldown_range=None):
         """
@@ -399,7 +400,7 @@ class BacktestEngine:
         results.sort(key=lambda x: x['summary']['total_profit_usd'], reverse=True)
         return results
 
-    def _group_by_timestamp(self, snapshots):
+    def _group_by_timestamp(self, snapshots: list[dict[str, Any]]) -> dict[float, list[dict[str, Any]]]:
         """
         Nhóm snapshots theo timestamp.
 
@@ -414,7 +415,8 @@ class BacktestEngine:
             grouped[snap['timestamp']].append(snap)
         return dict(sorted(grouped.items()))
 
-    def _calculate_equity(self, usd_balances, crypto_balances, prices):
+    def _calculate_equity(self, usd_balances: dict[str, float], crypto_balances: dict[str, float],
+                           prices: dict[str, Any]) -> float:
         """
         Tính tổng equity (USDT).
 
@@ -433,7 +435,7 @@ class BacktestEngine:
                 total += crypto * price
         return round(total, 4)
 
-    def _build_config(self, symbol, exchanges, initial_balance_usd, fees,
+    def _build_config(self, symbol: str, exchanges: list[str], initial_balance_usd: float, fees: dict[str, Any],
                       min_profit_usd, min_profit_pct, slippage_bps, cooldown_seconds):
         """Tạo dict cấu hình cho kết quả."""
         return {

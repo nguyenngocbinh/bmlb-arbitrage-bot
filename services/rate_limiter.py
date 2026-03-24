@@ -4,6 +4,7 @@ Hỗ trợ cấu hình riêng cho từng sàn.
 """
 import time
 import asyncio
+from typing import Any, Optional
 from collections import defaultdict
 from utils.logger import log_warning, log_debug
 
@@ -23,7 +24,7 @@ class RateLimiter:
         'kucoinfutures': {'requests_per_second': 5, 'burst': 10},
     }
 
-    def __init__(self, custom_limits=None):
+    def __init__(self, custom_limits: Optional[dict[str, dict[str, int]]] = None) -> None:
         """
         Khởi tạo rate limiter.
 
@@ -44,12 +45,12 @@ class RateLimiter:
         self._total_waits = defaultdict(int)
         self._total_wait_time = defaultdict(float)
 
-    def _get_limit(self, exchange_id):
+    def _get_limit(self, exchange_id: str) -> dict[str, int]:
         """Lấy cấu hình limit cho sàn."""
         default = {'requests_per_second': 5, 'burst': 10}
         return self._limits.get(exchange_id, default)
 
-    def _refill(self, exchange_id):
+    def _refill(self, exchange_id: str) -> None:
         """Nạp lại tokens dựa trên thời gian đã trôi qua."""
         now = time.monotonic()
         elapsed = now - self._last_refill[exchange_id]
@@ -62,7 +63,7 @@ class RateLimiter:
         )
         self._last_refill[exchange_id] = now
 
-    def acquire(self, exchange_id):
+    def acquire(self, exchange_id: str) -> None:
         """
         Lấy token đồng bộ (blocking nếu cần).
 
@@ -87,7 +88,7 @@ class RateLimiter:
         time.sleep(wait_time)
         self._tokens[exchange_id] = 0.0
 
-    async def async_acquire(self, exchange_id):
+    async def async_acquire(self, exchange_id: str) -> None:
         """
         Lấy token bất đồng bộ (non-blocking wait).
 
@@ -112,7 +113,7 @@ class RateLimiter:
         await asyncio.sleep(wait_time)
         self._tokens[exchange_id] = 0.0
 
-    def get_stats(self, exchange_id=None):
+    def get_stats(self, exchange_id: Optional[str] = None) -> dict[str, Any]:
         """
         Lấy thống kê rate limiting.
 
@@ -143,7 +144,7 @@ class RateLimiter:
             for ex_id in self._total_requests
         }
 
-    def reset_stats(self):
+    def reset_stats(self) -> None:
         """Reset thống kê."""
         self._total_requests.clear()
         self._total_waits.clear()
@@ -154,7 +155,7 @@ class RateLimiter:
 _global_rate_limiter = None
 
 
-def get_rate_limiter(custom_limits=None):
+def get_rate_limiter(custom_limits: Optional[dict[str, dict[str, int]]] = None) -> RateLimiter:
     """
     Lấy global rate limiter (singleton).
 

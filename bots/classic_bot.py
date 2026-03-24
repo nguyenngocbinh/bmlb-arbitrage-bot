@@ -7,6 +7,7 @@ from asyncio import gather
 import ccxt.pro
 import traceback
 
+from typing import Any, Optional
 from utils.logger import log_info, log_error, log_warning, log_debug
 from utils.exceptions import ArbitrageError, ExchangeError, InsufficientBalanceError, OrderError
 from utils.helpers import calculate_average
@@ -19,7 +20,9 @@ class ClassicBot(BaseBot):
     Bot giao dịch chênh lệch giá cổ điển, mua ở sàn giá thấp và bán ở sàn giá cao.
     """
     
-    def __init__(self, exchange_service, balance_service, order_service, notification_service, db_service=None, risk_config=None):
+    def __init__(self, exchange_service: Any, balance_service: Any, order_service: Any,
+                 notification_service: Any, db_service: Any = None,
+                 risk_config: Optional[dict[str, Any]] = None) -> None:
         """
         Khởi tạo bot giao dịch chênh lệch giá cổ điển.
         
@@ -57,7 +60,7 @@ class ClassicBot(BaseBot):
             'total_volume': 0
         }
     
-    async def start(self):
+    async def start(self) -> float:
         """
         Bắt đầu chạy bot giao dịch.
         
@@ -179,7 +182,7 @@ class ClassicBot(BaseBot):
                 
             return 0
     
-    async def _start_orderbook_loop(self):
+    async def _start_orderbook_loop(self) -> float:
         """
         Bắt đầu vòng lặp theo dõi sách lệnh trên tất cả các sàn.
         
@@ -203,7 +206,7 @@ class ClassicBot(BaseBot):
             log_debug(f"Chi tiết lỗi: {traceback.format_exc()}")
             raise
     
-    async def _exchange_loop(self, exchange_id):
+    async def _exchange_loop(self, exchange_id: str) -> None:
         """
         Vòng lặp theo dõi sách lệnh cho một sàn giao dịch cụ thể.
         
@@ -286,7 +289,8 @@ class ClassicBot(BaseBot):
                 except Exception:
                     pass
     
-    async def _execute_trade(self, min_ask_ex, max_bid_ex, profit_with_fees_pct, profit_with_fees_usd):
+    async def _execute_trade(self, min_ask_ex: str, max_bid_ex: str,
+                             profit_with_fees_pct: float, profit_with_fees_usd: float) -> None:
         """
         Thực hiện giao dịch chênh lệch giá.
         
@@ -397,7 +401,7 @@ class ClassicBot(BaseBot):
             log_debug(f"Chi tiết lỗi: {traceback.format_exc()}")
             return False
     
-    def _display_stats(self):
+    def _display_stats(self) -> None:
         """Hiển thị thống kê về phiên giao dịch."""
         elapsed_time = time.strftime('%H:%M:%S', time.gmtime(time.time() - self.start_time))
         
@@ -436,7 +440,7 @@ class ClassicBot(BaseBot):
             )
             self.notification_service.send_message(stats_message)
     
-    async def stop(self):
+    async def stop(self) -> float:
         """
         Dừng bot giao dịch và thực hiện các thao tác dọn dẹp.
         

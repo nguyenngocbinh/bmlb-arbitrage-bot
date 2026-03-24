@@ -3,6 +3,7 @@ Service quản lý số dư trên các sàn giao dịch.
 """
 import os
 import time
+from typing import Any, Optional
 from utils.logger import log_info, log_error, log_warning
 from utils.exceptions import InsufficientBalanceError
 from utils.helpers import read_file_content, update_balance_file, extract_base_asset
@@ -14,7 +15,7 @@ class BalanceService:
     Lớp dịch vụ quản lý số dư trên các sàn giao dịch.
     """
     
-    def __init__(self, exchange_service):
+    def __init__(self, exchange_service: Any) -> None:
         """
         Khởi tạo dịch vụ quản lý số dư.
         
@@ -26,7 +27,8 @@ class BalanceService:
         self.cache_time = {}  # Thời gian cache
         self.cache_timeout = 10  # Thời gian hết hạn cache (giây)
     
-    def check_balances(self, exchanges, symbol, total_amount, notification_service=None):
+    def check_balances(self, exchanges: list[str], symbol: str, total_amount: float,
+                       notification_service: Any = None) -> dict[str, dict[str, float]]:
         """
         Kiểm tra số dư trên các sàn giao dịch.
         
@@ -74,7 +76,7 @@ class BalanceService:
         
         return True
     
-    def get_balance(self, exchange_id, asset):
+    def get_balance(self, exchange_id: str, asset: str) -> float:
         """
         Lấy số dư của một tài sản trên sàn giao dịch với caching.
         
@@ -101,7 +103,7 @@ class BalanceService:
         
         return balance
     
-    def initialize_balances(self, exchanges, symbol, total_usd_amount):
+    def initialize_balances(self, exchanges: list[str], symbol: str, total_usd_amount: float) -> dict[str, float]:
         """
         Khởi tạo số dư ảo cho các sàn giao dịch.
         
@@ -121,7 +123,8 @@ class BalanceService:
         
         return usd
     
-    def initialize_crypto_balances(self, exchanges, symbol, average_price, total_usd_amount):
+    def initialize_crypto_balances(self, exchanges: list[str], symbol: str, average_price: float,
+                                    total_usd_amount: float) -> dict[str, float]:
         """
         Khởi tạo số dư tiền mã hóa ảo cho các sàn giao dịch.
         
@@ -145,7 +148,7 @@ class BalanceService:
         
         return crypto
     
-    def initialize_balance_files(self, amount):
+    def initialize_balance_files(self, amount: float) -> float:
         """
         Khởi tạo các tệp tin lưu trữ số dư.
         
@@ -159,7 +162,7 @@ class BalanceService:
         with open(BALANCE_FILE, 'w') as f:
             f.write(str(amount))
     
-    def update_balance_with_profit(self, profit_pct):
+    def update_balance_with_profit(self, profit_pct: float) -> float:
         """
         Cập nhật số dư với lợi nhuận.
         
@@ -188,7 +191,7 @@ class BalanceService:
             log_error(f"Lỗi khi cập nhật số dư với lợi nhuận: {str(e)}")
             return 0
     
-    def emergency_convert_all(self, symbol, exchanges):
+    def emergency_convert_all(self, symbol: str, exchanges: list[str]) -> None:
         """
         Chuyển đổi khẩn cấp tất cả tiền mã hóa sang USDT trên tất cả sàn.
         
@@ -210,7 +213,8 @@ class BalanceService:
         
         return True
     
-    def transfer_between_accounts(self, exchange_id, asset, amount, from_account, to_account):
+    def transfer_between_accounts(self, exchange_id: str, asset: str, amount: float,
+                                    from_account: str, to_account: str) -> bool:
         """
         Chuyển tiền giữa các tài khoản trên cùng một sàn giao dịch.
         

@@ -3,6 +3,7 @@ Service quản lý các hoạt động đặt lệnh giao dịch bất đồng b
 Cho phép đặt lệnh mua/bán đồng thời trên nhiều sàn.
 """
 import asyncio
+from typing import Any, Optional
 from utils.logger import log_info, log_error, log_warning
 from utils.exceptions import OrderError, OrderFillTimeoutError, FuturesError
 from configs import FIRST_ORDERS_FILL_TIMEOUT
@@ -15,7 +16,7 @@ class AsyncOrderService:
     Sử dụng ccxt.pro để đặt lệnh đồng thời trên nhiều sàn.
     """
 
-    def __init__(self, exchange_service):
+    def __init__(self, exchange_service: Any) -> None:
         """
         Khởi tạo dịch vụ quản lý lệnh async.
 
@@ -24,7 +25,7 @@ class AsyncOrderService:
         """
         self.exchange_service = exchange_service
 
-    async def place_initial_orders(self, exchanges, symbol, amount_per_exchange,
+    async def place_initial_orders(self, exchanges: list[str], symbol: str, amount_per_exchange: float,
                                    price, notification_service=None):
         """
         Đặt lệnh mua ban đầu đồng thời trên tất cả các sàn.
@@ -78,7 +79,7 @@ class AsyncOrderService:
             exchanges, symbol, notification_service
         )
 
-    async def _wait_for_initial_fills(self, exchanges, symbol,
+    async def _wait_for_initial_fills(self, exchanges: list[str], symbol: str,
                                       notification_service=None):
         """
         Chờ tất cả lệnh ban đầu khớp (async polling).
@@ -145,14 +146,14 @@ class AsyncOrderService:
 
         return True
 
-    async def _check_fill(self, exchange_id, symbol):
+    async def _check_fill(self, exchange_id: str, symbol: str) -> bool:
         """Kiểm tra lệnh đã khớp chưa."""
         open_orders = await self.exchange_service.async_fetch_open_orders(
             exchange_id, symbol
         )
         return len(open_orders) == 0
 
-    async def _cancel_unfilled_orders(self, exchanges, symbol):
+    async def _cancel_unfilled_orders(self, exchanges: list[str], symbol: str) -> None:
         """Hủy lệnh chưa khớp trên các sàn."""
         for exchange_id in exchanges:
             try:
@@ -167,7 +168,7 @@ class AsyncOrderService:
             except Exception as e:
                 log_error(f"Lỗi khi hủy lệnh trên {exchange_id}: {str(e)}")
 
-    async def place_arbitrage_orders(self, min_ask_ex, max_bid_ex, symbol,
+    async def place_arbitrage_orders(self, min_ask_ex: str, max_bid_ex: str, symbol: str,
                                      amount, min_ask_price, max_bid_price,
                                      notification_service=None):
         """
@@ -286,7 +287,7 @@ class AsyncOrderService:
         except Exception as e:
             raise OrderError(f"{min_ask_ex}/{max_bid_ex}", "arbitrage", str(e))
 
-    async def _wait_for_arbitrage_fills(self, min_ask_ex, max_bid_ex, symbol,
+    async def _wait_for_arbitrage_fills(self, min_ask_ex: str, max_bid_ex: str, symbol: str,
                                         amount, buy_placed, sell_placed,
                                         notification_service=None):
         """
@@ -356,7 +357,7 @@ class AsyncOrderService:
 
         return buy_filled and sell_filled
 
-    async def _handle_arbitrage_timeout(self, min_ask_ex, max_bid_ex, symbol,
+    async def _handle_arbitrage_timeout(self, min_ask_ex: str, max_bid_ex: str, symbol: str,
                                         buy_filled, sell_filled,
                                         notification_service=None):
         """Xử lý khi lệnh arbitrage timeout."""
@@ -417,7 +418,7 @@ class AsyncOrderService:
             )
             log_info("Đã hủy cả hai lệnh.")
 
-    async def async_emergency_sell(self, symbol, exchanges):
+    async def async_emergency_sell(self, symbol: str, exchanges: list[str]) -> None:
         """
         Bán khẩn cấp tất cả trên nhiều sàn đồng thời.
 
@@ -442,7 +443,7 @@ class AsyncOrderService:
 
         return True
 
-    async def place_futures_short_order(self, exchange_id, symbol, amount,
+    async def place_futures_short_order(self, exchange_id: str, symbol: str, amount: float,
                                         leverage=1):
         """
         Đặt lệnh Short futures (async).
@@ -471,7 +472,7 @@ class AsyncOrderService:
         except Exception as e:
             raise FuturesError(exchange_id, f"Async: Không thể đặt lệnh short: {str(e)}")
 
-    async def close_futures_short_order(self, exchange_id, symbol, amount,
+    async def close_futures_short_order(self, exchange_id: str, symbol: str, amount: float,
                                         leverage=1):
         """
         Đóng lệnh Short futures (async).
@@ -500,7 +501,7 @@ class AsyncOrderService:
         except Exception as e:
             raise FuturesError(exchange_id, f"Async: Không thể đóng lệnh short: {str(e)}")
 
-    async def wait_for_futures_order_fill(self, exchange_id, symbol, timeout=120):
+    async def wait_for_futures_order_fill(self, exchange_id: str, symbol: str, timeout: int = 120) -> bool:
         """
         Đợi lệnh futures khớp (async).
 
@@ -551,7 +552,7 @@ class AsyncOrderService:
     # ─── Slippage Helpers ─────────────────────────────────────────────
 
     @staticmethod
-    def _extract_fill_price(order_response, expected_price):
+    def _extract_fill_price(order_response: Any, expected_price: float) -> float:
         """
         Trích xuất giá fill thực tế từ response của sàn.
 
@@ -580,7 +581,7 @@ class AsyncOrderService:
 
         return expected_price
 
-    async def _update_fill_prices(self, fill_result, min_ask_ex, max_bid_ex,
+    async def _update_fill_prices(self, fill_result: dict[str, Any], min_ask_ex: str, max_bid_ex: str,
                                    symbol, amount):
         """
         Cập nhật giá fill thực tế từ closed orders sau khi lệnh đã khớp.
@@ -617,7 +618,7 @@ class AsyncOrderService:
             log_warning(f"Không thể lấy giá fill thực tế: {str(e)}")
 
     @staticmethod
-    def _calculate_slippage(fill_result, amount):
+    def _calculate_slippage(fill_result: dict[str, Any], amount: float) -> dict[str, Any]:
         """
         Tính slippage dựa trên giá kỳ vọng vs giá thực tế.
 

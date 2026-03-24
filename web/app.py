@@ -6,11 +6,12 @@ from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import os
+from typing import Optional
 
 from services.database_service import DatabaseService
 
 
-def create_app(db_service=None):
+def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
     """
     Tạo FastAPI app.
 

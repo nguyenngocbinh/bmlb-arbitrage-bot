@@ -17,7 +17,7 @@ class NotificationService:
     Hiện tại chỉ hỗ trợ Telegram.
     """
     
-    def __init__(self, enabled=False):
+    def __init__(self, enabled: bool = False) -> None:
         """
         Khởi tạo dịch vụ thông báo.
         
@@ -28,7 +28,7 @@ class NotificationService:
         self.telegram_token = os.getenv('TELEGRAM_API_TOKEN')
         self.telegram_chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
-    def send_message(self, message):
+    def send_message(self, message: str) -> bool:
         """
         Gửi thông báo đến các kênh đã cấu hình.
         
@@ -49,7 +49,7 @@ class NotificationService:
         
         return success
     
-    def send_telegram(self, message):
+    def send_telegram(self, message: str) -> bool:
         """
         Gửi thông báo qua Telegram.
         
@@ -84,9 +84,12 @@ class NotificationService:
         except requests.exceptions.RequestException as e:
             raise NotificationError('Telegram', str(e))
     
-    def send_opportunity(self, trade_number, min_ask_ex, min_ask_price, max_bid_ex, max_bid_price, 
-                         profit_pct, profit_usd, total_profit_pct, total_profit_usd, 
-                         fees_usd, fees_crypto, crypto_pair, elapsed_time, balances, current_worth):
+    def send_opportunity(self, trade_number: int, min_ask_ex: str, min_ask_price: float,
+                         max_bid_ex: str, max_bid_price: float, 
+                         profit_pct: float, profit_usd: float, total_profit_pct: float,
+                         total_profit_usd: float, 
+                         fees_usd: float, fees_crypto: float, crypto_pair: str,
+                         elapsed_time: str, balances: dict, current_worth: float) -> bool:
         """
         Gửi thông báo về cơ hội giao dịch qua Telegram.
         

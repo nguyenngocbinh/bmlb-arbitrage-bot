@@ -6,6 +6,7 @@ import asyncio
 import signal
 import sys
 from asyncio import gather
+from typing import Any, Optional
 import ccxt.pro
 from colorama import Fore, Style
 
@@ -23,7 +24,9 @@ class BaseBot:
     Lớp bot giao dịch cơ sở với các chức năng chung.
     """
     
-    def __init__(self, exchange_service, balance_service, order_service, notification_service, config=None, db_service=None, risk_config=None):
+    def __init__(self, exchange_service: Any, balance_service: Any, order_service: Any,
+                 notification_service: Any, config: Optional[dict[str, Any]] = None,
+                 db_service: Any = None, risk_config: Optional[dict[str, Any]] = None) -> None:
         """
         Khởi tạo bot giao dịch.
         
@@ -74,7 +77,8 @@ class BaseBot:
         if ENABLE_CTRL_C_HANDLING:
             signal.signal(signal.SIGINT, self._handle_interrupt)
     
-    def configure(self, symbol, exchanges, timeout, amount_usd, indicatif=None):
+    def configure(self, symbol: str, exchanges: list[str], timeout: int, amount_usd: float,
+                  indicatif: Optional[str] = None) -> None:
         """
         Cấu hình bot giao dịch.
         
@@ -93,7 +97,7 @@ class BaseBot:
         
         log_info(f"Cấu hình bot với: {symbol}, {exchanges}, {timeout}s, {amount_usd} USDT")
     
-    async def start(self):
+    async def start(self) -> float:
         """
         Bắt đầu chạy bot giao dịch.
         
@@ -105,7 +109,7 @@ class BaseBot:
         """
         raise NotImplementedError("Phương thức này cần được triển khai ở lớp con")
     
-    async def stop(self):
+    async def stop(self) -> float:
         """
         Dừng bot giao dịch và thực hiện các thao tác dọn dẹp.
         
@@ -155,7 +159,7 @@ class BaseBot:
         
         return self.total_absolute_profit_pct
     
-    def _handle_interrupt(self, sig, frame):
+    def _handle_interrupt(self, sig: int, frame: Any) -> None:
         """
         Xử lý khi người dùng nhấn Ctrl+C.
         
@@ -186,7 +190,7 @@ class BaseBot:
                 # Nếu người dùng nhấn Ctrl+C một lần nữa, thoát ngay lập tức
                 sys.exit(1)
     
-    async def _start_orderbook_loop(self):
+    async def _start_orderbook_loop(self) -> float:
         """
         Bắt đầu vòng lặp theo dõi sách lệnh trên tất cả các sàn.
         
@@ -209,7 +213,7 @@ class BaseBot:
             log_error(f"Lỗi trong vòng lặp theo dõi sách lệnh: {str(e)}")
             raise
     
-    async def _exchange_loop(self, exchange_id):
+    async def _exchange_loop(self, exchange_id: str) -> None:
         """
         Vòng lặp theo dõi sách lệnh cho một sàn giao dịch cụ thể.
         
@@ -260,7 +264,7 @@ class BaseBot:
                 except Exception:
                     pass
     
-    async def process_orderbook(self, exchange_id, orderbook):
+    async def process_orderbook(self, exchange_id: str, orderbook: dict[str, Any]) -> bool:
         """
         Xử lý dữ liệu sách lệnh nhận được từ sàn giao dịch.
         
@@ -340,7 +344,8 @@ class BaseBot:
             
         return False
     
-    def _display_best_opportunity(self, min_ask_ex, max_bid_ex, profit_with_fees_usd):
+    def _display_best_opportunity(self, min_ask_ex: str, max_bid_ex: str,
+                                    profit_with_fees_usd: float) -> None:
         """
         Hiển thị thông tin về cơ hội giao dịch tốt nhất hiện tại.
         
@@ -368,7 +373,8 @@ class BaseBot:
             f"mua: {min_ask_ex} ở {self.min_ask_price}     bán: {max_bid_ex} ở {self.max_bid_price}"
         )
     
-    def _should_execute_trade(self, min_ask_ex, max_bid_ex, profit_with_fees_usd, profit_with_fees_pct):
+    def _should_execute_trade(self, min_ask_ex: str, max_bid_ex: str,
+                               profit_with_fees_usd: float, profit_with_fees_pct: float) -> bool:
         """
         Kiểm tra xem có nên thực hiện giao dịch hay không.
         
@@ -414,7 +420,8 @@ class BaseBot:
         # Nếu qua tất cả các điều kiện, có thể thực hiện giao dịch
         return True
     
-    async def _execute_trade(self, min_ask_ex, max_bid_ex, profit_with_fees_pct, profit_with_fees_usd):
+    async def _execute_trade(self, min_ask_ex: str, max_bid_ex: str,
+                             profit_with_fees_pct: float, profit_with_fees_usd: float) -> None:
         """
         Thực hiện giao dịch chênh lệch giá.
         
@@ -503,7 +510,8 @@ class BaseBot:
             log_error(f"Lỗi khi thực hiện giao dịch: {str(e)}")
             return False
     
-    def _process_slippage(self, trade_id, fill_result, min_ask_ex, max_bid_ex):
+    def _process_slippage(self, trade_id: int, fill_result: dict[str, Any],
+                           min_ask_ex: str, max_bid_ex: str) -> None:
         """
         Xử lý và lưu thông tin slippage sau giao dịch.
         
@@ -556,7 +564,7 @@ class BaseBot:
             except Exception as e:
                 log_error(f"Lỗi khi cập nhật slippage vào database: {str(e)}")
 
-    def _update_balances_after_trade(self, min_ask_ex, max_bid_ex):
+    def _update_balances_after_trade(self, min_ask_ex: str, max_bid_ex: str) -> None:
         """
         Cập nhật số dư sau khi thực hiện giao dịch.
         
@@ -581,7 +589,7 @@ class BaseBot:
         # Tăng số dư USDT trên sàn bán
         self.usd[max_bid_ex] += self.crypto_per_transaction * self.max_bid_price * (1 - sell_fee_rate)
     
-    def _update_transaction_amount(self):
+    def _update_transaction_amount(self) -> None:
         """
         Cập nhật số lượng crypto mỗi giao dịch.
         """
@@ -591,7 +599,8 @@ class BaseBot:
         # Cập nhật số lượng crypto mỗi giao dịch (lấy trung bình)
         self.crypto_per_transaction = total_crypto / len(self.exchanges) * 0.99  # Giảm 1% để đảm bảo đủ số dư
     
-    def _display_trade_report(self, min_ask_ex, max_bid_ex, profit_pct, profit_usd, fee_usd, fee_crypto):
+    def _display_trade_report(self, min_ask_ex: str, max_bid_ex: str, profit_pct: float,
+                               profit_usd: float, fee_usd: float, fee_crypto: float) -> None:
         """
         Hiển thị báo cáo về giao dịch đã thực hiện.
         

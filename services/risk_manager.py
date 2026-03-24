@@ -2,6 +2,7 @@
 Service quản lý rủi ro cho bot giao dịch.
 Bao gồm: max drawdown, stop-loss, circuit breaker, giới hạn lỗ liên tiếp.
 """
+from typing import Any, Optional
 from utils.logger import log_info, log_warning, log_error
 
 
@@ -10,7 +11,7 @@ class RiskManager:
     Quản lý rủi ro giao dịch với nhiều lớp bảo vệ.
     """
 
-    def __init__(self, config=None):
+    def __init__(self, config: Optional[dict[str, Any]] = None) -> None:
         """
         Khởi tạo RiskManager với cấu hình.
 
@@ -44,31 +45,31 @@ class RiskManager:
         self._cooldown_until = 0  # timestamp
 
     @property
-    def is_stopped(self):
+    def is_stopped(self) -> bool:
         """Kiểm tra risk manager đã dừng bot chưa."""
         return self._stopped
 
     @property
-    def stop_reason(self):
+    def stop_reason(self) -> Optional[str]:
         """Lý do dừng bot."""
         return self._stop_reason
 
     @property
-    def consecutive_losses(self):
+    def consecutive_losses(self) -> int:
         return self._consecutive_losses
 
     @property
-    def peak_profit_pct(self):
+    def peak_profit_pct(self) -> float:
         return self._peak_profit_pct
 
     @property
-    def current_drawdown_pct(self):
+    def current_drawdown_pct(self) -> float:
         """Drawdown hiện tại so với đỉnh lợi nhuận."""
         if self._peak_profit_pct <= 0:
             return abs(min(0, self._total_profit_pct))
         return self._peak_profit_pct - self._total_profit_pct
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset trạng thái cho phiên mới."""
         self._consecutive_losses = 0
         self._peak_profit_pct = 0.0
@@ -79,7 +80,7 @@ class RiskManager:
         self._stop_reason = None
         self._cooldown_until = 0
 
-    def check_pre_trade(self, estimated_profit_usd, current_time=0):
+    def check_pre_trade(self, estimated_profit_usd: float, current_time: float = 0) -> tuple[bool, Optional[str]]:
         """
         Kiểm tra trước khi thực hiện giao dịch.
 
@@ -117,8 +118,8 @@ class RiskManager:
 
         return True, None
 
-    def check_post_trade(self, profit_usd, profit_pct, slippage_usd=0,
-                         total_profit_pct=None, current_time=0):
+    def check_post_trade(self, profit_usd: float, profit_pct: float, slippage_usd: float = 0,
+                         total_profit_pct: Optional[float] = None, current_time: float = 0) -> tuple[bool, Optional[str]]:
         """
         Kiểm tra sau giao dịch và cập nhật state.
 
@@ -199,13 +200,13 @@ class RiskManager:
 
         return True, None
 
-    def _stop(self, reason_code, reason_message):
+    def _stop(self, reason_code: str, reason_message: str) -> None:
         """Dừng bot vì lý do rủi ro."""
         self._stopped = True
         self._stop_reason = reason_message
         log_error(f"RISK MANAGER - DỪNG BOT: {reason_message}")
 
-    def get_status(self):
+    def get_status(self) -> dict[str, Any]:
         """
         Lấy trạng thái hiện tại của risk manager.
 
