@@ -104,6 +104,23 @@
         }
         th { background: #141d27; color: var(--muted); font-weight: 650; }
         tr:last-child td { border-bottom: 0; }
+        .exchange-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .exchange-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+            border-radius: 7px;
+            font-weight: 700;
+        }
+        .exchange-link:hover { border-color: var(--accent); color: var(--accent); }
         .btn {
             display: inline-flex;
             align-items: center;
@@ -122,6 +139,9 @@
             border-top: 1px solid rgba(255,255,255,0.08);
             color: var(--muted);
             padding: 28px 0;
+        }
+        @media (max-width: 720px) {
+            .exchange-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
     </style>
 </head>
@@ -192,10 +212,24 @@
 
         <section>
             <h2>1. Install</h2>
-            <pre><code>git clone https://github.com/nguyenngocbinh/bmlb-arbitrage-bot.git
+            <pre><code>git clone https://github.com/nguyenngocbinhneu/bmlb-arbitrage-bot.git
 cd bmlb-arbitrage-bot
 pip install -r requirements.txt</code></pre>
             <p>For the first run, do not create a <code>.env</code> file with real trading keys. The safe demo does not need it.</p>
+        </section>
+
+        <section>
+            <h2>Exchange account links</h2>
+            <p>If you do not already have exchange accounts, these referral links can be used to sign up.</p>
+            <div class="exchange-grid" aria-label="Exchange sign-up links">
+                <a class="exchange-link" href="https://www.binance.com/vi/referral/earn-together/refer2earn-usdc/claim?hl=vi&ref=GRO_28502_F9YAO&utm_source=referral_entrance" rel="noopener noreferrer">Binance</a>
+                <a class="exchange-link" href="https://www.bybitglobal.com/invite?ref=LJ7X7P" rel="noopener noreferrer">Bybit</a>
+                <a class="exchange-link" href="https://www.okx.com/vi/join/8978408" rel="noopener noreferrer">OKX</a>
+                <a class="exchange-link" href="https://www.kucoin.com/ucenter/signup?rcode=QBSYA6AQ&utm_source=rf" rel="noopener noreferrer">KuCoin</a>
+            </div>
+            <div class="callout">
+                These may be referral links. Check each exchange's fees, regional availability, KYC rules, API permissions, and risk terms before using live trading features.
+            </div>
         </section>
 
         <section id="paper-trading">

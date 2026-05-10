@@ -25,12 +25,25 @@ Use this order:
 ## 1. Install
 
 ```bash
-git clone https://github.com/nguyenngocbinh/bmlb-arbitrage-bot.git
+git clone https://github.com/nguyenngocbinhneu/bmlb-arbitrage-bot.git
 cd bmlb-arbitrage-bot
 pip install -r requirements.txt
 ```
 
 For your first run, do not add real exchange API keys. The fake-money demo does not need them.
+
+## Exchange account links
+
+If you do not already have exchange accounts, these referral links can be used to sign up:
+
+| Exchange | Sign-up link |
+|----------|--------------|
+| Binance | [Open Binance account](https://www.binance.com/vi/referral/earn-together/refer2earn-usdc/claim?hl=vi&ref=GRO_28502_F9YAO&utm_source=referral_entrance) |
+| Bybit | [Open Bybit account](https://www.bybitglobal.com/invite?ref=LJ7X7P) |
+| OKX | [Open OKX account](https://www.okx.com/vi/join/8978408) |
+| KuCoin | [Open KuCoin account](https://www.kucoin.com/ucenter/signup?rcode=QBSYA6AQ&utm_source=rf) |
+
+These may be referral links. Check each exchange's fees, regional availability, KYC rules, API permissions, and risk terms before using live trading features.
 
 ## 2. Run the safest demo
 
@@ -60,6 +73,39 @@ Open:
 
 ```text
 http://localhost:8000/dashboard
+```
+
+### Common error: WinError 10013 on port 8000
+
+If Uvicorn shows this error:
+
+```text
+ERROR:    [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions
+```
+
+Port `8000` is usually already being used by another Uvicorn process, or Windows is blocking that socket. Check whether the dashboard is already running:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/health
+```
+
+If it returns `ok`, open:
+
+```text
+http://127.0.0.1:8000/dashboard
+```
+
+To stop the existing process, find the PID and stop it:
+
+```powershell
+netstat -ano | Select-String ':8000'
+Stop-Process -Id <PID>
+```
+
+Or run the dashboard on another port:
+
+```powershell
+python -m uvicorn web.app:app --reload --port 8001
 ```
 
 Review:

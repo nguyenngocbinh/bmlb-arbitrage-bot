@@ -117,6 +117,22 @@
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 16px;
         }
+        .exchange-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .exchange-link {
+            display: flex;
+            min-height: 54px;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel);
+            font-weight: 750;
+        }
+        .exchange-link:hover { border-color: var(--accent); color: var(--accent); }
         .card, .price-card, .shot {
             background: var(--panel);
             border: 1px solid var(--line);
@@ -160,7 +176,7 @@
             .hero { min-height: auto; padding-top: 52px; }
             .section-head { display: block; }
             .section-copy { margin-top: 10px; }
-            .feature-grid, .pricing-grid, .screenshot-grid { grid-template-columns: 1fr; }
+            .feature-grid, .pricing-grid, .screenshot-grid, .exchange-grid { grid-template-columns: 1fr; }
             .metric-row { grid-template-columns: 1fr; }
         }
     </style>
@@ -172,6 +188,7 @@
             <nav class="nav-links" aria-label="Primary">
                 <a href="#demo">Demo</a>
                 <a href="/getting-started">Beginner guide</a>
+                <a href="#exchanges">Exchanges</a>
                 <a href="#screenshots">Screenshots</a>
                 <a href="#pricing">Pricing</a>
                 <a href="#disclaimer">Disclaimer</a>
@@ -253,6 +270,21 @@ python -m uvicorn web.app:app --reload --port 8000
                         <h3>3. Dry-run guard</h3>
                         <p>Add <code>--dry-run</code> to classic or delta-neutral commands to force the bot onto the FakeMoneyBot path.</p>
                     </article>
+                </div>
+            </div>
+        </section>
+
+        <section id="exchanges">
+            <div class="shell">
+                <div class="section-head">
+                    <h2>Exchange account links</h2>
+                    <p class="section-copy">Use these referral links if you need to create accounts on the exchanges supported by the bot. Review fees, KYC, regional access, and API permissions before live trading.</p>
+                </div>
+                <div class="exchange-grid" aria-label="Exchange sign-up links">
+                    <a class="exchange-link" href="https://www.binance.com/vi/referral/earn-together/refer2earn-usdc/claim?hl=vi&ref=GRO_28502_F9YAO&utm_source=referral_entrance" rel="noopener noreferrer">Binance</a>
+                    <a class="exchange-link" href="https://www.bybitglobal.com/invite?ref=LJ7X7P" rel="noopener noreferrer">Bybit</a>
+                    <a class="exchange-link" href="https://www.okx.com/vi/join/8978408" rel="noopener noreferrer">OKX</a>
+                    <a class="exchange-link" href="https://www.kucoin.com/ucenter/signup?rcode=QBSYA6AQ&utm_source=rf" rel="noopener noreferrer">KuCoin</a>
                 </div>
             </div>
         </section>
@@ -345,7 +377,7 @@ python -m uvicorn web.app:app --reload --port 8000
                             <span>More alert channels</span>
                             <span>Deployment guides</span>
                         </div>
-                        <a class="btn btn-primary" href="https://github.com/nguyenngocbinh/bmlb-arbitrage-bot/issues">Request access</a>
+                        <a class="btn btn-primary" href="https://github.com/nguyenngocbinhneu/bmlb-arbitrage-bot/issues">Request access</a>
                     </article>
                     <article class="price-card">
                         <h3>Enterprise</h3>
@@ -356,7 +388,7 @@ python -m uvicorn web.app:app --reload --port 8000
                             <span>Custom exchange integration</span>
                             <span>Priority support</span>
                         </div>
-                        <a class="btn" href="https://github.com/nguyenngocbinh/bmlb-arbitrage-bot/issues">Contact</a>
+                        <a class="btn" href="https://github.com/nguyenngocbinhneu/bmlb-arbitrage-bot/issues">Contact</a>
                     </article>
                 </div>
             </div>

@@ -65,7 +65,7 @@ bmlb-arbitrage-bot/
 ## Cài đặt
 
 ```bash
-git clone https://github.com/nguyenngocbinh/bmlb-arbitrage-bot.git
+git clone https://github.com/nguyenngocbinhneu/bmlb-arbitrage-bot.git
 cd bmlb-arbitrage-bot
 pip install -r requirements.txt
 ```
@@ -84,6 +84,19 @@ Thứ tự kiểm thử khuyến nghị:
 2. Chạy mode `fake-money` và xem kết quả trên dashboard.
 3. Test command dạng `classic` hoặc `delta-neutral` với `--dry-run`.
 4. Chỉ cân nhắc live trading sau khi đã hiểu logs, phí, slippage, quyền API key, và giới hạn rủi ro.
+
+## Mở tài khoản sàn
+
+Nếu bạn chưa có tài khoản trên các sàn được bot hỗ trợ, có thể đăng ký qua các link giới thiệu sau:
+
+| Sàn | Link đăng ký |
+|-----|-------------|
+| Binance | [Mở tài khoản Binance](https://www.binance.com/vi/referral/earn-together/refer2earn-usdc/claim?hl=vi&ref=GRO_28502_F9YAO&utm_source=referral_entrance) |
+| Bybit | [Mở tài khoản Bybit](https://www.bybitglobal.com/invite?ref=LJ7X7P) |
+| OKX | [Mở tài khoản OKX](https://www.okx.com/vi/join/8978408) |
+| KuCoin | [Mở tài khoản KuCoin](https://www.kucoin.com/ucenter/signup?rcode=QBSYA6AQ&utm_source=rf) |
+
+Các link trên có thể là link giới thiệu. Hãy tự kiểm tra điều khoản, phí, khu vực hỗ trợ, KYC và quyền API của từng sàn trước khi dùng.
 
 ## Cấu hình
 
@@ -184,6 +197,37 @@ python -m uvicorn web.app:app --reload --port 8000
 # API docs: http://localhost:8000/docs
 ```
 
+### Lỗi thường gặp
+
+**`[WinError 10013]` khi chạy Uvicorn trên port 8000**
+
+Lỗi này thường xảy ra khi port `8000` đang được một phiên Uvicorn khác dùng, hoặc Windows đang chặn socket đó.
+
+Kiểm tra dashboard có đang chạy sẵn không:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/health
+```
+
+Nếu trả về `ok`, mở dashboard tại:
+
+```text
+http://127.0.0.1:8000/dashboard
+```
+
+Nếu muốn dừng process cũ:
+
+```powershell
+netstat -ano | Select-String ':8000'
+Stop-Process -Id <PID>
+```
+
+Hoặc chạy dashboard bằng port khác:
+
+```powershell
+python -m uvicorn web.app:app --reload --port 8001
+```
+
 ### Backtesting
 
 ```python
@@ -255,5 +299,5 @@ Copyright (c) 2026 Nguyễn Ngọc Bình. All Rights Reserved.
 
 ## Liên hệ
 
-- GitHub: [nguyenngocbinh](https://github.com/nguyenngocbinh)
-- Issues: [Mở issue](https://github.com/nguyenngocbinh/bmlb-arbitrage-bot/issues)
+- GitHub: [nguyenngocbinhneu](https://github.com/nguyenngocbinhneu)
+- Issues: [Mở issue](https://github.com/nguyenngocbinhneu/bmlb-arbitrage-bot/issues)
