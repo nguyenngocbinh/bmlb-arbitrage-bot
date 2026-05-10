@@ -33,7 +33,7 @@ web/
 
 ```bash
 # Chạy trực tiếp
-uvicorn web.app:app --reload --port 8000
+python -m uvicorn web.app:app --reload --port 8000
 
 # Truy cập
 # Dashboard: http://localhost:8000

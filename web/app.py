@@ -36,6 +36,16 @@ def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
     # ─── Dashboard HTML ───────────────────────────────────────────
 
     @app.get("/", response_class=HTMLResponse)
+    async def landing(request: Request):
+        """Landing page for product positioning, demo, pricing, and risk notes."""
+        return templates.TemplateResponse(request, "landing.html", context={})
+
+    @app.get("/getting-started", response_class=HTMLResponse)
+    async def getting_started(request: Request):
+        """Beginner guide with safe paper trading and dry-run workflow."""
+        return templates.TemplateResponse(request, "getting_started.html", context={})
+
+    @app.get("/dashboard", response_class=HTMLResponse)
     async def dashboard(request: Request):
         """Trang dashboard chính."""
         stats = db.get_overall_stats()

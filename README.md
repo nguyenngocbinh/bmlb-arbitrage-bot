@@ -70,6 +70,21 @@ cd bmlb-arbitrage-bot
 pip install -r requirements.txt
 ```
 
+## Hướng dẫn cho người mới
+
+Người mới nên bắt đầu bằng paper trading trước khi cấu hình API key thật.
+
+- Tài liệu đầy đủ: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)
+- Hướng dẫn trên web: chạy `python -m uvicorn web.app:app --reload --port 8000`, rồi mở `http://localhost:8000/getting-started`
+- Lệnh an toàn đầu tiên: `python -m bots.demo_fake_bot --symbol BTC/USDT --exchanges binance okx bybit --duration 5`
+
+Thứ tự kiểm thử khuyến nghị:
+
+1. Chạy demo fake-money standalone.
+2. Chạy mode `fake-money` và xem kết quả trên dashboard.
+3. Test command dạng `classic` hoặc `delta-neutral` với `--dry-run`.
+4. Chỉ cân nhắc live trading sau khi đã hiểu logs, phí, slippage, quyền API key, và giới hạn rủi ro.
+
 ## Cấu hình
 
 Tạo file `.env` trong thư mục gốc:
@@ -104,6 +119,33 @@ CHAT_ID=your_chat_id
 python -m bots.demo_fake_bot --symbol BTC/USDT --exchanges binance okx bybit --duration 5
 ```
 
+### Dry-run / paper trading an toàn
+
+Có 2 cách test an toàn trước khi giao dịch thật:
+
+1. Dùng `fake-money`: chạy bot theo luồng đầy đủ nhưng mô phỏng giao dịch bằng tiền giả.
+2. Thêm `--dry-run`: ép `classic` hoặc `delta-neutral` chạy qua `FakeMoneyBot`, không gửi lệnh thật.
+
+```bash
+# Paper trading đầy đủ, không cần đặt lệnh thật
+python main.py fake-money 15 1000 binance kucoin okx BTC/USDT
+
+# Test command classic nhưng vẫn không đặt lệnh thật
+python main.py classic 15 1000 binance kucoin okx BTC/USDT --dry-run
+
+# Test command delta-neutral nhưng vẫn không đặt lệnh thật
+python main.py delta-neutral 15 1000 binance kucoin okx BTC/USDT --dry-run
+```
+
+Sau khi chạy paper trading, mở dashboard để xem session, simulated trades, PnL, phí và slippage:
+
+```bash
+python -m uvicorn web.app:app --reload --port 8000
+# Dashboard: http://localhost:8000/dashboard
+```
+
+Không chạy live mode nếu bạn chưa kiểm tra dashboard, chưa hiểu phí/slippage, hoặc API key vẫn có quyền rút tiền.
+
 ### Chạy bot đầy đủ
 
 ```bash
@@ -135,8 +177,10 @@ python main.py fake-money 15 1000 binance kucoin okx --symbols BTC/USDT ETH/USDT
 ### Web Dashboard
 
 ```bash
-uvicorn web.app:app --reload --port 8000
-# Truy cập: http://localhost:8000
+python -m uvicorn web.app:app --reload --port 8000
+# Landing page: http://localhost:8000
+# Hướng dẫn người mới: http://localhost:8000/getting-started
+# Dashboard: http://localhost:8000/dashboard
 # API docs: http://localhost:8000/docs
 ```
 

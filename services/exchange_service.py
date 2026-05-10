@@ -12,6 +12,7 @@ from utils.logger import log_info, log_error, log_debug
 from utils.exceptions import ExchangeError, InsufficientBalanceError, FuturesError
 from utils.helpers import calculate_average, extract_base_asset
 from services.rate_limiter import get_rate_limiter
+from configs import SUPPORTED_EXCHANGES
 
 # Tải biến môi trường
 load_dotenv()
@@ -31,6 +32,9 @@ class ExchangeService:
     
     def _initialize_exchanges(self) -> None:
         """Khởi tạo đối tượng sàn giao dịch với thông tin xác thực từ biến môi trường."""
+        for exchange_id in SUPPORTED_EXCHANGES:
+            self.exchanges[exchange_id] = {'enableRateLimit': True}
+
         # Khởi tạo Binance
         if os.getenv('BINANCE_API_KEY') and os.getenv('BINANCE_SECRET'):
             self.exchanges['binance'] = {
