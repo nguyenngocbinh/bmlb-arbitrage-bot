@@ -32,3 +32,6 @@ applyTo: "{bots,services}/**/*.py"
 - RiskManager.check_risk() phải được gọi TRƯỚC mỗi giao dịch
 - DatabaseService.record_trade() phải được gọi SAU mỗi giao dịch
 - Luôn close exchange connections trong bot.cleanup()
+- Các hàm đọc số dư/giá từ sàn phải dùng async end-to-end (`await` ở bot level)
+- `BalanceService.check_balances()` và `BalanceService.get_balance()` là async, không gọi kiểu sync
+- Khi bật sandbox (`USE_SANDBOX=true`), bot vẫn giữ nguyên flow, chỉ đổi credential sang `*_TESTNET_*`

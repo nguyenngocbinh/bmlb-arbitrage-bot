@@ -48,6 +48,22 @@ main.py             # Entry point
 - **Async Orders**: Parallel order execution trên nhiều sàn cùng lúc
 - **Slippage Tracking**: Theo dõi chênh lệch giữa expected vs actual price
 
+## Async Contract (Quan trọng)
+- `ExchangeService` I/O với sàn là async (`get_ticker`, `get_balance`, `get_global_average_price`, ccxt.pro methods)
+- `BalanceService.check_balances()` và `BalanceService.get_balance()` là async; bot code PHẢI `await`
+- Không so sánh trực tiếp coroutine với số (`float`) trong luồng khởi tạo bot
+- Khi migrate sync → async, cập nhật đồng thời call sites trong bot + test integration
+
+## Sandbox/Testnet
+- Dùng `USE_SANDBOX=true` để bật sandbox mode cho ccxt/ccxt.pro
+- Khi bật sandbox, ưu tiên biến môi trường `*_TESTNET_*` trước biến production
+- Biến được hỗ trợ:
+  - `BINANCE_TESTNET_API_KEY`, `BINANCE_TESTNET_SECRET`
+  - `KUCOIN_TESTNET_API_KEY`, `KUCOIN_TESTNET_SECRET`, `KUCOIN_TESTNET_PASSWORD`
+  - `OKX_TESTNET_API_KEY`, `OKX_TESTNET_SECRET`, `OKX_TESTNET_PASSWORD`
+  - `BYBIT_TESTNET_API_KEY`, `BYBIT_TESTNET_SECRET`
+- Không dùng production key cho smoke test mode thật
+
 ## Database
 - SQLite with WAL mode, foreign keys ON
 - Tables: sessions, trades, opportunities, balance_snapshots
@@ -82,6 +98,14 @@ pytest tests/test_backtest.py -v            # Run backtest tests
 - Tests trong `tests/` directory
 - Mock ccxt exchanges cho unit tests
 - `pytest tests/ -v` từ project root
+- Với thay đổi async contract, chạy thêm: `pytest tests/test_integration.py -q`
+
+## Smoke Test Checklist
+- Luôn chạy với `--no-recovery` để tránh prompt tương tác khi test tự động
+- Ưu tiên sandbox/testnet key + vốn nhỏ + thời gian ngắn
+- Lệnh tham chiếu:
+  - `USE_SANDBOX=true python main.py classic 1 50 binance kucoin okx BTC/USDT --no-recovery`
+  - `USE_SANDBOX=true python main.py delta-neutral 1 50 binance kucoin okx BTC/USDT --no-recovery`
 
 ## Configuration
 - `configs.py`: Global settings (exchanges, fees, risk, paths)
