@@ -3,11 +3,12 @@ Bot mô phỏng giao dịch với tiền ảo, không thực hiện giao dịch 
 """
 import time
 import asyncio
+import traceback
 from asyncio import gather
 from typing import Any, Optional
 import ccxt.pro
 
-from utils.logger import log_info, log_error, log_warning
+from utils.logger import log_info, log_error, log_warning, log_debug
 from utils.exceptions import ArbitrageError
 from utils.helpers import calculate_average
 from bots.base_bot import BaseBot
@@ -127,9 +128,10 @@ class FakeMoneyBot(BaseBot):
         Returns:
             None
         """
+        pro_exchange = None
         try:
             # Tạo đối tượng sàn giao dịch ccxt.pro
-            pro_exchange = await self.exchange_service.get_pro_exchange(exchange_id)
+            pro_exchange = await self.exchange_service.get_pro_exchange(exchange_id, public_only=True)
             
             # Theo dõi sách lệnh cho đến khi hết thời gian
             while time.time() <= self.timeout:
@@ -142,13 +144,18 @@ class FakeMoneyBot(BaseBot):
                     
                 except Exception as loop_error:
                     log_error(f"Lỗi trong vòng lặp {exchange_id}: {str(loop_error)}")
+                    log_debug(f"Chi tiết lỗi {exchange_id}: {type(loop_error).__name__}: {repr(loop_error)}")
+                    log_debug(traceback.format_exc())
                     break
-            
-            # Đóng kết nối với sàn giao dịch
-            await pro_exchange.close()
             
         except Exception as e:
             log_error(f"Lỗi khi khởi tạo vòng lặp cho {exchange_id}: {str(e)}")
+        finally:
+            if pro_exchange:
+                try:
+                    await pro_exchange.close()
+                except Exception:
+                    pass
     
     async def _execute_trade(self, min_ask_ex: str, max_bid_ex: str,
                              profit_with_fees_pct: float, profit_with_fees_usd: float) -> None:

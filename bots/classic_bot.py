@@ -82,7 +82,12 @@ class ClassicBot(BaseBot):
             
             # Kiểm tra số dư
             try:
-                self.balance_service.check_balances(self.exchanges, 'USDT', self.howmuchusd, self.notification_service)
+                await self.balance_service.check_balances(
+                    self.exchanges,
+                    'USDT',
+                    self.howmuchusd,
+                    self.notification_service
+                )
             except InsufficientBalanceError as e:
                 log_error(f"Không đủ số dư: {str(e)}")
                 self.error_counts['balance'] += 1
@@ -102,7 +107,7 @@ class ClassicBot(BaseBot):
                     prices = []
                     for exchange_id in self.exchanges:
                         try:
-                            ticker = self.exchange_service.get_ticker(exchange_id, self.symbol)
+                            ticker = await self.exchange_service.get_ticker(exchange_id, self.symbol)
                             prices.append((ticker['bid'] + ticker['ask']) / 2)
                         except Exception:
                             continue

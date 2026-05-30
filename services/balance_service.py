@@ -27,8 +27,8 @@ class BalanceService:
         self.cache_time = {}  # Thời gian cache
         self.cache_timeout = 10  # Thời gian hết hạn cache (giây)
     
-    def check_balances(self, exchanges: list[str], symbol: str, total_amount: float,
-                       notification_service: Any = None) -> dict[str, dict[str, float]]:
+    async def check_balances(self, exchanges: list[str], symbol: str, total_amount: float,
+                             notification_service: Any = None) -> bool:
         """
         Kiểm tra số dư trên các sàn giao dịch.
         
@@ -51,7 +51,7 @@ class BalanceService:
         available_amount = 0
         
         for exchange_id in exchanges:
-            balance = self.get_balance(exchange_id, 'USDT')
+            balance = await self.get_balance(exchange_id, 'USDT')
             
             if balance < amount_per_exchange:
                 message = (
@@ -76,7 +76,7 @@ class BalanceService:
         
         return True
     
-    def get_balance(self, exchange_id: str, asset: str) -> float:
+    async def get_balance(self, exchange_id: str, asset: str) -> float:
         """
         Lấy số dư của một tài sản trên sàn giao dịch với caching.
         
@@ -95,7 +95,7 @@ class BalanceService:
             return self.cache[cache_key]
         
         # Nếu không có cache hoặc đã hết hạn, lấy số dư mới
-        balance = self.exchange_service.get_balance(exchange_id, asset)
+        balance = await self.exchange_service.async_get_balance(exchange_id, asset)
         
         # Cập nhật cache
         self.cache[cache_key] = balance

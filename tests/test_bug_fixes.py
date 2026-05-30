@@ -43,15 +43,13 @@ class TestOrderServiceTimeout:
     """Test that the timeout calculation is correct."""
 
     def test_timeout_is_in_seconds(self):
-        """Regression test: FIRST_ORDERS_FILL_TIMEOUT is in seconds, not multiplied by 60."""
+        """Regression test: FIRST_ORDERS_FILL_TIMEOUT là giây, không phải phút."""
         from configs import FIRST_ORDERS_FILL_TIMEOUT
 
-        # The timeout should be 3600 seconds = 1 hour (not 3600 * 60 * 0.5 = 30 hours)
         timeout_seconds = FIRST_ORDERS_FILL_TIMEOUT
-        assert timeout_seconds == 3600
-        # Previously the bug was: timeout_seconds = FIRST_ORDERS_FILL_TIMEOUT * 60 * 0.5
-        # Which would be 108000 seconds = 30 hours
-        assert timeout_seconds < 7200  # Should be at most 2 hours
+        assert timeout_seconds == 300
+        # Phải đủ ngắn cho arbitrage (tối đa 10 phút = 600 giây)
+        assert timeout_seconds < 600
 
 
 class TestBaseBotZeroDivision:

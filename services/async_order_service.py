@@ -263,6 +263,19 @@ class AsyncOrderService:
                 raise OrderError(f"{min_ask_ex}/{max_bid_ex}", "arbitrage",
                                  "Cả hai lệnh đều thất bại")
 
+            # Xử lý lệch vị thế: một lệnh thành công, một lệnh thất bại
+            if buy_success and not sell_success:
+                log_warning(f"Sell thất bại trên {max_bid_ex}, đang đảo lệnh mua trên {min_ask_ex}...")
+                await self._emergency_reverse_buy(min_ask_ex, symbol, amount, notification_service)
+                fill_result['success'] = False
+                return fill_result
+
+            if sell_success and not buy_success:
+                log_warning(f"Buy thất bại trên {min_ask_ex}, đang đảo lệnh bán trên {max_bid_ex}...")
+                await self._emergency_reverse_sell(max_bid_ex, symbol, amount, notification_service)
+                fill_result['success'] = False
+                return fill_result
+
             fill_result['success'] = True
 
             # Chờ lệnh khớp (tối đa 3 phút) và cập nhật giá thực tế
@@ -548,6 +561,58 @@ class AsyncOrderService:
                 exchange_id,
                 f"Lỗi khi đợi lệnh futures khớp: {str(e)}"
             )
+
+    # ─── Position Recovery Helpers ────────────────────────────────────
+
+    async def _emergency_reverse_buy(self, exchange_id: str, symbol: str, amount: float,
+                                      notification_service=None) -> None:
+        """
+        Khi sell thất bại sau khi buy đã đặt: hủy lệnh mua nếu còn open,
+        hoặc bán market ngay nếu đã fill để đảo vị thế.
+        """
+        try:
+            open_orders = await self.exchange_service.async_fetch_open_orders(exchange_id, symbol)
+            if open_orders:
+                await self.exchange_service.async_cancel_order(
+                    exchange_id, open_orders[0]['id'], symbol
+                )
+                log_info(f"Đã hủy lệnh mua trên {exchange_id} (sell thất bại).")
+            else:
+                await self.exchange_service.async_create_market_sell_order(
+                    exchange_id, symbol, amount
+                )
+                log_warning(f"Lệnh mua đã fill — đã bán market trên {exchange_id} để đảo vị thế.")
+            if notification_service:
+                notification_service.send_message(
+                    f"⚠️ Đảo lệnh mua trên {exchange_id} — sell leg thất bại"
+                )
+        except Exception as e:
+            log_error(f"Lỗi khi đảo lệnh mua trên {exchange_id}: {str(e)}")
+
+    async def _emergency_reverse_sell(self, exchange_id: str, symbol: str, amount: float,
+                                       notification_service=None) -> None:
+        """
+        Khi buy thất bại sau khi sell đã đặt: hủy lệnh bán nếu còn open,
+        hoặc mua market ngay nếu đã fill để đảo vị thế.
+        """
+        try:
+            open_orders = await self.exchange_service.async_fetch_open_orders(exchange_id, symbol)
+            if open_orders:
+                await self.exchange_service.async_cancel_order(
+                    exchange_id, open_orders[0]['id'], symbol
+                )
+                log_info(f"Đã hủy lệnh bán trên {exchange_id} (buy thất bại).")
+            else:
+                await self.exchange_service.async_create_market_buy_order(
+                    exchange_id, symbol, amount
+                )
+                log_warning(f"Lệnh bán đã fill — đã mua market trên {exchange_id} để đảo vị thế.")
+            if notification_service:
+                notification_service.send_message(
+                    f"⚠️ Đảo lệnh bán trên {exchange_id} — buy leg thất bại"
+                )
+        except Exception as e:
+            log_error(f"Lỗi khi đảo lệnh bán trên {exchange_id}: {str(e)}")
 
     # ─── Slippage Helpers ─────────────────────────────────────────────
 

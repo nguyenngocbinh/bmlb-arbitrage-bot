@@ -864,3 +864,145 @@ class DatabaseService:
                 'buy_slippage': [dict(r) for r in buy_rows],
                 'sell_slippage': [dict(r) for r in sell_rows]
             }
+
+    # ─── Session Recovery ─────────────────────────────────────────────
+
+    def get_interrupted_sessions(self) -> list[dict[str, Any]]:
+        """
+        Lấy danh sách phiên bị dừng (status = 'running').
+        
+        Returns:
+            list[dict]: Danh sách phiên chưa hoàn thành
+        """
+        with self._get_connection() as conn:
+            rows = conn.execute("""
+                SELECT * FROM sessions 
+                WHERE status = 'running'
+                ORDER BY id DESC
+            """).fetchall()
+            return [dict(row) for row in rows]
+
+    def get_last_trade(self, session_id: int) -> Optional[dict[str, Any]]:
+        """
+        Lấy giao dịch cuối cùng của một phiên.
+        
+        Args:
+            session_id (int): ID phiên giao dịch
+        
+        Returns:
+            dict: Thông tin giao dịch cuối cùng hoặc None
+        """
+        with self._get_connection() as conn:
+            row = conn.execute("""
+                SELECT * FROM trades 
+                WHERE session_id = ?
+                ORDER BY id DESC
+                LIMIT 1
+            """, (session_id,)).fetchone()
+            return dict(row) if row else None
+
+    def get_last_trade_number(self, session_id: int) -> int:
+        """
+        Lấy số thứ tự giao dịch cuối cùng của một phiên.
+        
+        Args:
+            session_id (int): ID phiên giao dịch
+        
+        Returns:
+            int: Số thứ tự giao dịch cuối cùng (hoặc 0 nếu không có giao dịch)
+        """
+        with self._get_connection() as conn:
+            row = conn.execute("""
+                SELECT MAX(trade_number) as last_trade_number FROM trades 
+                WHERE session_id = ?
+            """, (session_id,)).fetchone()
+            return row['last_trade_number'] if row and row['last_trade_number'] else 0
+
+    def get_cumulative_profit_at_session(self, session_id: int) -> tuple[float, float]:
+        """
+        Lấy lợi nhuận tích lũy tại cuối phiên.
+        
+        Args:
+            session_id (int): ID phiên giao dịch
+        
+        Returns:
+            tuple: (cumulative_profit_pct, cumulative_profit_usd)
+        """
+        last_trade = self.get_last_trade(session_id)
+        if last_trade:
+            return (
+                last_trade.get('cumulative_profit_pct', 0),
+                last_trade.get('cumulative_profit_usd', 0)
+            )
+        return (0, 0)
+
+    def mark_session_interrupted(self, session_id: int, error_message: str = None) -> None:
+        """
+        Đánh dấu phiên là bị interrupt (chuẩn bị khôi phục).
+        
+        Args:
+            session_id (int): ID phiên giao dịch
+            error_message (str, optional): Thông báo lỗi
+        """
+        self.update_session(
+            session_id,
+            status='interrupted',
+            error_message=error_message or 'Session was interrupted and recovered'
+        )
+        log_info(f"Phiên #{session_id} được đánh dấu là interrupted")
+
+    def mark_session_resumed(self, session_id: int, new_session_id: int = None) -> None:
+        """
+        Đánh dấu phiên đã được khôi phục.
+        
+        Args:
+            session_id (int): ID phiên giao dịch cũ
+            new_session_id (int, optional): ID phiên mới sau khi khôi phục
+        """
+        if new_session_id:
+            # Liên kết phiên cũ với phiên mới (nếu có cột parent_session_id)
+            # Hiện tại ta chỉ cập nhật status
+            pass
+        
+        self.update_session(
+            session_id,
+            status='resumed'
+        )
+        log_info(f"Phiên #{session_id} được đánh dấu là resumed")
+
+    def get_session_recovery_info(self, session_id: int) -> dict[str, Any]:
+        """
+        Lấy thông tin đầy đủ để khôi phục phiên.
+        
+        Args:
+            session_id (int): ID phiên giao dịch
+        
+        Returns:
+            dict: Thông tin khôi phục
+        """
+        session = self.get_session(session_id)
+        if not session:
+            return None
+        
+        last_trade = self.get_last_trade(session_id)
+        last_trade_number = self.get_last_trade_number(session_id)
+        cum_profit_pct, cum_profit_usd = self.get_cumulative_profit_at_session(session_id)
+        balance_snapshots = self.get_balance_history(session_id)
+        opportunities_count = len(self.get_opportunities_by_session(session_id))
+        
+        return {
+            'session_id': session_id,
+            'mode': session.get('mode'),
+            'symbol': session.get('symbol'),
+            'exchanges': session.get('exchanges', '').split(','),
+            'usdt_amount': session.get('usdt_amount'),
+            'renew_time_minutes': session.get('renew_time_minutes'),
+            'start_time': session.get('start_time'),
+            'last_trade_number': last_trade_number,
+            'last_trade': dict(last_trade) if last_trade else None,
+            'cumulative_profit_pct': cum_profit_pct,
+            'cumulative_profit_usd': cum_profit_usd,
+            'balance_snapshots': balance_snapshots,
+            'opportunities_found': opportunities_count,
+            'trades_executed': session.get('trades_executed', 0)
+        }

@@ -137,19 +137,21 @@ def notification_service():
 class TestBalanceServiceIntegration:
     """Test tích hợp giữa BalanceService và ExchangeService."""
 
-    def test_check_balances_sufficient(self, balance_service, mock_exchange_service):
+    @pytest.mark.asyncio
+    async def test_check_balances_sufficient(self, balance_service, mock_exchange_service):
         """Test khi có đủ số dư trên tất cả sàn."""
-        mock_exchange_service.get_balance.return_value = 500.0
-        result = balance_service.check_balances(
+        mock_exchange_service.async_get_balance.return_value = 500.0
+        result = await balance_service.check_balances(
             ['binance', 'kucoin', 'okx'], 'USDT', 1000.0
         )
         assert result is True
 
-    def test_check_balances_insufficient(self, balance_service, mock_exchange_service):
+    @pytest.mark.asyncio
+    async def test_check_balances_insufficient(self, balance_service, mock_exchange_service):
         """Test khi không đủ số dư."""
-        mock_exchange_service.get_balance.return_value = 50.0
+        mock_exchange_service.async_get_balance.return_value = 50.0
         with pytest.raises(InsufficientBalanceError):
-            balance_service.check_balances(
+            await balance_service.check_balances(
                 ['binance', 'kucoin', 'okx'], 'USDT', 1000.0
             )
 
@@ -171,13 +173,14 @@ class TestBalanceServiceIntegration:
         assert crypto['binance'] == pytest.approx(0.005)  # (1000/2) / 50000 / 2
         assert crypto['kucoin'] == pytest.approx(0.005)
 
-    def test_balance_caching(self, balance_service, mock_exchange_service):
+    @pytest.mark.asyncio
+    async def test_balance_caching(self, balance_service, mock_exchange_service):
         """Test rằng caching hoạt động."""
-        mock_exchange_service.get_balance.return_value = 500.0
-        balance_service.get_balance('binance', 'USDT')
-        balance_service.get_balance('binance', 'USDT')
+        mock_exchange_service.async_get_balance.return_value = 500.0
+        await balance_service.get_balance('binance', 'USDT')
+        await balance_service.get_balance('binance', 'USDT')
         # API chỉ gọi 1 lần nhờ cache
-        assert mock_exchange_service.get_balance.call_count == 1
+        assert mock_exchange_service.async_get_balance.call_count == 1
 
     def test_balance_file_operations(self, balance_service):
         """Test đọc/ghi file số dư."""

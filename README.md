@@ -15,6 +15,7 @@ Bot giao dịch chênh lệch giá crypto tự động giữa nhiều sàn. Hỗ
 - **Web dashboard**: FastAPI + Jinja2 theo dõi giao dịch qua trình duyệt
 - **Backtesting**: Replay dữ liệu lịch sử, parameter sweep, phân tích metrics
 - **Telegram alerts**: Thông báo cơ hội, giao dịch, lỗi qua Telegram
+- **Session Recovery**: 🆕 Khôi phục tự động phiên bị dừng do lỗi hoặc ngắt kết nối
 
 ## Cấu trúc dự án
 
@@ -75,6 +76,7 @@ pip install -r requirements.txt
 Người mới nên bắt đầu bằng paper trading trước khi cấu hình API key thật.
 
 - Tài liệu đầy đủ: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)
+- **Khôi phục phiên bị dừng**: [docs/SESSION_RECOVERY.md](docs/SESSION_RECOVERY.md) 🆕
 - Hướng dẫn trên web: chạy `python -m uvicorn web.app:app --reload --port 8000`, rồi mở `http://localhost:8000/getting-started`
 - Lệnh an toàn đầu tiên: `python -m bots.demo_fake_bot --symbol BTC/USDT --exchanges binance okx bybit --duration 5`
 
