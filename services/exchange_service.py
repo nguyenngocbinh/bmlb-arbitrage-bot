@@ -347,8 +347,9 @@ class ExchangeService:
             ExchangeError: Nếu có lỗi khi lấy danh sách lệnh
         """
         exchange = self.get_exchange(exchange_id)
-        
+
         try:
+            self._rate_limiter.acquire(exchange_id)
             return exchange.fetch_open_orders(symbol)
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể lấy danh sách lệnh đang mở cho {symbol}: {str(e)}")
@@ -368,8 +369,9 @@ class ExchangeService:
             ExchangeError: Nếu có lỗi khi lấy danh sách lệnh
         """
         exchange = self.get_exchange(exchange_id)
-        
+
         try:
+            self._rate_limiter.acquire(exchange_id)
             return exchange.fetch_closed_orders(symbol)
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể lấy danh sách lệnh đã đóng cho {symbol}: {str(e)}")
@@ -390,8 +392,9 @@ class ExchangeService:
             ExchangeError: Nếu có lỗi khi hủy lệnh
         """
         exchange = self.get_exchange(exchange_id)
-        
+
         try:
+            self._rate_limiter.acquire(exchange_id)
             return exchange.cancel_order(order_id, symbol)
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể hủy lệnh {order_id} cho {symbol}: {str(e)}")
@@ -730,6 +733,7 @@ class ExchangeService:
         """
         params = params or {}
         try:
+            await self._rate_limiter.async_acquire(exchange_id)
             pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
             return await pro_exchange.create_market_buy_order(symbol, amount, params)
         except Exception as e:
@@ -750,6 +754,7 @@ class ExchangeService:
         """
         params = params or {}
         try:
+            await self._rate_limiter.async_acquire(exchange_id)
             pro_exchange = await self._get_or_create_pro_exchange(exchange_id)
             return await pro_exchange.create_market_sell_order(symbol, amount, params)
         except Exception as e:

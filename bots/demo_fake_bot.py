@@ -21,6 +21,7 @@ import ccxt.pro
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from configs import EXCHANGE_FEES
+from utils.logger import safe_print
 
 init()
 
@@ -53,29 +54,29 @@ class FakeMoneyDemo:
 
     async def run(self):
         """Chạy demo bot."""
-        print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-        print(f"{Fore.CYAN}  BMLB FAKE MONEY DEMO - Dữ liệu thực từ sàn{Style.RESET_ALL}")
-        print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-        print(f"  Symbol  : {Fore.YELLOW}{self.symbol}{Style.RESET_ALL}")
-        print(f"  Sàn     : {Fore.YELLOW}{', '.join(self.exchange_ids)}{Style.RESET_ALL}")
-        print(f"  Vốn     : {Fore.GREEN}{self.usd_amount} USDT{Style.RESET_ALL}")
-        print(f"  Thời gian: {Fore.YELLOW}{self.duration_sec // 60} phút{Style.RESET_ALL}")
-        print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
+        safe_print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+        safe_print(f"{Fore.CYAN}  BMLB FAKE MONEY DEMO - Dữ liệu thực từ sàn{Style.RESET_ALL}")
+        safe_print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+        safe_print(f"  Symbol  : {Fore.YELLOW}{self.symbol}{Style.RESET_ALL}")
+        safe_print(f"  Sàn     : {Fore.YELLOW}{', '.join(self.exchange_ids)}{Style.RESET_ALL}")
+        safe_print(f"  Vốn     : {Fore.GREEN}{self.usd_amount} USDT{Style.RESET_ALL}")
+        safe_print(f"  Thời gian: {Fore.YELLOW}{self.duration_sec // 60} phút{Style.RESET_ALL}")
+        safe_print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
 
         # Khởi tạo exchanges (public, không cần API key)
         for eid in self.exchange_ids:
             try:
                 exchange_class = getattr(ccxt.pro, eid)
                 self.pro_exchanges[eid] = exchange_class({'enableRateLimit': True})
-                print(f"  {Fore.GREEN}✓{Style.RESET_ALL} Kết nối {eid}")
+                safe_print(f"  {Fore.GREEN}✓{Style.RESET_ALL} Kết nối {eid}")
             except Exception as e:
-                print(f"  {Fore.RED}✗{Style.RESET_ALL} Không thể kết nối {eid}: {e}")
+                safe_print(f"  {Fore.RED}✗{Style.RESET_ALL} Không thể kết nối {eid}: {e}")
 
         if len(self.pro_exchanges) < 2:
-            print(f"\n{Fore.RED}Cần ít nhất 2 sàn để chạy arbitrage!{Style.RESET_ALL}")
+            safe_print(f"\n{Fore.RED}Cần ít nhất 2 sàn để chạy arbitrage!{Style.RESET_ALL}")
             return
 
-        print(f"\n{Fore.YELLOW}Đang theo dõi orderbook... (Ctrl+C để dừng){Style.RESET_ALL}\n")
+        safe_print(f"\n{Fore.YELLOW}Đang theo dõi orderbook... (Ctrl+C để dừng){Style.RESET_ALL}\n")
 
         timeout = time.time() + self.duration_sec
 
@@ -84,7 +85,7 @@ class FakeMoneyDemo:
             tasks = [self._watch_orderbook(eid, timeout) for eid in self.pro_exchanges]
             await asyncio.gather(*tasks)
         except KeyboardInterrupt:
-            print(f"\n{Fore.YELLOW}Đã dừng bởi người dùng.{Style.RESET_ALL}")
+            safe_print(f"\n{Fore.YELLOW}Đã dừng bởi người dùng.{Style.RESET_ALL}")
         finally:
             # Đóng tất cả connections
             for eid, ex in self.pro_exchanges.items():
@@ -117,7 +118,7 @@ class FakeMoneyDemo:
                 err_str = str(e)
                 if 'ExchangeClosedByUser' in err_str or 'connection closed' in err_str.lower():
                     break
-                print(f"  {Fore.RED}[{exchange_id}] Lỗi: {err_str[:80]}{Style.RESET_ALL}")
+                safe_print(f"  {Fore.RED}[{exchange_id}] Lỗi: {err_str[:80]}{Style.RESET_ALL}")
                 await asyncio.sleep(1)
 
     def _check_arbitrage(self, trigger_exchange: str):
@@ -163,7 +164,7 @@ class FakeMoneyDemo:
             self.total_profit_usd += profit_usd
             self.trade_count += 1
 
-            print(
+            safe_print(
                 f"  {Fore.GREEN}[{timestamp}] ★ TRADE #{self.trade_count}{Style.RESET_ALL} | "
                 f"Mua {best_ask_exchange} @ {ask_price:,.2f} → "
                 f"Bán {best_bid_exchange} @ {bid_price:,.2f} | "
@@ -174,7 +175,7 @@ class FakeMoneyDemo:
         else:
             # Cơ hội không đủ lãi — chỉ log
             if self.opportunities % 50 == 0:  # In mỗi 50 lần để không spam
-                print(
+                safe_print(
                     f"  {Fore.WHITE}[{timestamp}]{Style.RESET_ALL} "
                     f"Mua {best_ask_exchange} @ {ask_price:,.2f} → "
                     f"Bán {best_bid_exchange} @ {bid_price:,.2f} | "
@@ -184,20 +185,20 @@ class FakeMoneyDemo:
 
     def _print_summary(self):
         """In tổng kết phiên giao dịch."""
-        print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-        print(f"{Fore.CYAN}  KẾT QUẢ PHIÊN MÔ PHỎNG{Style.RESET_ALL}")
-        print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-        print(f"  Cặp giao dịch  : {self.symbol}")
-        print(f"  Sàn            : {', '.join(self.exchange_ids)}")
-        print(f"  Vốn ban đầu    : {self.initial_usd:,.2f} USDT")
-        print(f"  Cơ hội phát hiện: {self.opportunities}")
-        print(f"  Giao dịch thực hiện: {self.trade_count}")
+        safe_print(f"\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+        safe_print(f"{Fore.CYAN}  KẾT QUẢ PHIÊN MÔ PHỎNG{Style.RESET_ALL}")
+        safe_print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+        safe_print(f"  Cặp giao dịch  : {self.symbol}")
+        safe_print(f"  Sàn            : {', '.join(self.exchange_ids)}")
+        safe_print(f"  Vốn ban đầu    : {self.initial_usd:,.2f} USDT")
+        safe_print(f"  Cơ hội phát hiện: {self.opportunities}")
+        safe_print(f"  Giao dịch thực hiện: {self.trade_count}")
 
         color = Fore.GREEN if self.total_profit_usd >= 0 else Fore.RED
         profit_pct = (self.total_profit_usd / self.initial_usd * 100) if self.initial_usd else 0
-        print(f"  Lợi nhuận      : {color}{self.total_profit_usd:+.4f} USD ({profit_pct:+.4f}%){Style.RESET_ALL}")
-        print(f"  Vốn cuối       : {self.initial_usd + self.total_profit_usd:,.2f} USDT")
-        print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
+        safe_print(f"  Lợi nhuận      : {color}{self.total_profit_usd:+.4f} USD ({profit_pct:+.4f}%){Style.RESET_ALL}")
+        safe_print(f"  Vốn cuối       : {self.initial_usd + self.total_profit_usd:,.2f} USDT")
+        safe_print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
 
 
 # ─── Main ──────────────────────────────────────────────────────
@@ -223,4 +224,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(demo.run())
     except KeyboardInterrupt:
-        print(f"\n{Fore.YELLOW}Đã dừng.{Style.RESET_ALL}")
+        safe_print(f"\n{Fore.YELLOW}Đã dừng.{Style.RESET_ALL}")
