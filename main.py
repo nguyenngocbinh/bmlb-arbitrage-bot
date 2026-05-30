@@ -11,6 +11,7 @@ import asyncio
 import argparse
 import logging
 import concurrent.futures
+import aiohttp
 from colorama import Style, Fore, init
 from dotenv import load_dotenv
 
@@ -33,9 +34,24 @@ from bots.delta_neutral_bot import DeltaNeutralBot
 from bots.fake_money_bot import FakeMoneyBot
 
 # Import các module tiện ích
-from utils.logger import log_info, log_error, log_warning, logger
+from utils.logger import log_info, log_error, log_warning, logger, safe_print, configure_console_encoding
 from utils.helpers import show_time
+from utils.session_recovery import SessionRecovery
 from configs import PYTHON_COMMAND, ENABLE_TELEGRAM, BOT_MODES
+
+configure_console_encoding()
+
+
+def configure_async_dns_resolver() -> None:
+    """Chuyển aiohttp sang threaded resolver trên Windows để tránh lỗi DNS của aiodns."""
+    if sys.platform != 'win32':
+        return
+
+    aiohttp.connector.DefaultResolver = aiohttp.ThreadedResolver
+    aiohttp.resolver.DefaultResolver = aiohttp.ThreadedResolver
+
+
+configure_async_dns_resolver()
 
 
 def setup_logging(level=logging.INFO):
@@ -67,7 +83,7 @@ def setup_logging(level=logging.INFO):
 
 def display_banner():
     """Hiển thị banner khi khởi động ứng dụng."""
-    print("""
+    safe_print("""
                 ╔═╗─╔╗────────────────╔═╗─╔╗─────────╔══╗───╔╗
                 ║║╚╗║║────────────────║║╚╗║║─────────║╔╗║───║║
                 ║╔╗╚╝╠══╦╗╔╦╗─╔╦══╦═╗─║╔╗╚╝╠══╦══╦══╗║╚╝╚╦═╗║╚═╗
@@ -77,8 +93,8 @@ def display_banner():
                 ─────╔═╝║──╔═╝║────────────╔═╝║
                 ─────╚══╝──╚══╝────────────╚══╝
     """)
-    print(f"\n{Fore.CYAN}BMLB Arbitrage Bot{Style.RESET_ALL} - Giao dịch chênh lệch giá crypto tự động")
-    print("\nGithub: nguyenngocbinh\nTwitter: @nanabi88\n")
+    safe_print(f"\n{Fore.CYAN}BMLB Arbitrage Bot{Style.RESET_ALL} - Giao dịch chênh lệch giá crypto tự động")
+    safe_print("\nGithub: nguyenngocbinh\nTwitter: @nanabi88\n")
 
 
 def parse_arguments():
@@ -107,6 +123,7 @@ def parse_arguments():
     parser.add_argument('--debug', action='store_true', help='Kích hoạt chế độ debug')
     parser.add_argument('--no-banner', action='store_true', help='Không hiển thị banner')
     parser.add_argument('--dry-run', action='store_true', help='Chạy mà không thực hiện giao dịch thực tế')
+    parser.add_argument('--no-recovery', action='store_true', help='Bỏ qua khôi phục phiên bị dừng')
     parser.add_argument('--symbols', nargs='+', help='Nhiều cặp giao dịch (vd: --symbols BTC/USDT ETH/USDT)')
     
     return parser.parse_args()
@@ -174,7 +191,7 @@ async def find_best_symbol(exchange_service, exchanges):
                 
                 # Thu thập giá từ các sàn
                 for exchange_id in exchanges:
-                    ticker = exchange_service.get_ticker(exchange_id, pair)
+                    ticker = await exchange_service.get_ticker(exchange_id, pair)
                     bid_prices[exchange_id] = ticker['bid']
                     ask_prices[exchange_id] = ticker['ask']
                 
@@ -245,6 +262,11 @@ async def run_bot(mode, symbol, usdt_amount, renew_time, exchanges, dry_run=Fals
     Returns:
         float: Tổng lợi nhuận (phần trăm)
     """
+    bot = None
+    db_service = None
+    recovery = None
+    exchange_service = None
+    
     try:
         # Khởi tạo các dịch vụ
         exchange_service = ExchangeService()
@@ -252,6 +274,7 @@ async def run_bot(mode, symbol, usdt_amount, renew_time, exchanges, dry_run=Fals
         order_service = OrderService(exchange_service)
         notification_service = NotificationService(ENABLE_TELEGRAM)
         db_service = DatabaseService()
+        recovery = SessionRecovery(db_service)
         
         # Log thông tin khởi động
         log_info(f"Khởi động bot với chế độ: {mode}, số tiền: {usdt_amount} USDT, thời gian làm mới: {renew_time} phút")
@@ -309,18 +332,42 @@ async def run_bot(mode, symbol, usdt_amount, renew_time, exchanges, dry_run=Fals
         
         # Chạy bot
         start_time = time.time()
-        profit_pct = await bot.start()
-        end_time = time.time()
-        
-        # Log thông tin kết thúc
-        elapsed_time = time.strftime('%H:%M:%S', time.gmtime(end_time - start_time))
-        log_info(f"Bot đã kết thúc sau {elapsed_time}. Tổng lợi nhuận: {profit_pct:.4f}%")
-        
-        return profit_pct
+        try:
+            profit_pct = await bot.start()
+            end_time = time.time()
+            
+            # Log thông tin kết thúc
+            elapsed_time = time.strftime('%H:%M:%S', time.gmtime(end_time - start_time))
+            log_info(f"Bot đã kết thúc sau {elapsed_time}. Tổng lợi nhuận: {profit_pct:.4f}%")
+            
+            return profit_pct
+            
+        except KeyboardInterrupt:
+            # Khi Ctrl+C, phiên sẽ được xử lý bởi bot.stop() trong signal handler
+            raise
+        except Exception as e:
+            # Nếu xảy ra lỗi trong bot, đánh dấu session là interrupted
+            error_msg = f"Lỗi trong khi chạy bot: {str(e)}"
+            log_error(error_msg)
+            
+            if bot and bot.session_id and db_service:
+                try:
+                    log_warning(f"Đánh dấu phiên #{bot.session_id} là interrupted")
+                    recovery.mark_interrupted(bot.session_id, error_msg)
+                except Exception as recovery_error:
+                    log_error(f"Lỗi khi đánh dấu phiên interrupted: {str(recovery_error)}")
+            
+            raise
         
     except Exception as e:
         log_error(f"Lỗi khi chạy bot: {str(e)}")
         return 0
+    finally:
+        if exchange_service:
+            try:
+                await exchange_service.close_all_pro_exchanges()
+            except Exception as close_error:
+                log_warning(f"Không thể đóng toàn bộ kết nối pro: {str(close_error)}")
 
 
 async def main():
@@ -328,6 +375,10 @@ async def main():
     try:
         # Thiết lập logging
         setup_logging()
+        
+        # Khởi tạo database service để kiểm tra phiên bị dừng
+        db_service = DatabaseService()
+        recovery = SessionRecovery(db_service)
         
         # Nếu có tham số dòng lệnh
         if len(sys.argv) > 1:
@@ -348,7 +399,9 @@ async def main():
             exchanges = [args.exchange1, args.exchange2, args.exchange3]
             symbol = args.symbol
             dry_run = args.dry_run
+            no_recovery = args.no_recovery
             symbols = args.symbols  # Multi-pair
+            recovered_session_id = None
             
         # Nếu không có tham số dòng lệnh, lấy thông tin từ người dùng
         else:
@@ -363,7 +416,43 @@ async def main():
             exchanges = [inputs["exchange_1"], inputs["exchange_2"], inputs["exchange_3"]]
             symbol = inputs["crypto"] if inputs["crypto"] else None
             dry_run = False  # Mặc định không phải dry run khi nhập thủ công
+            no_recovery = False
             symbols = None  # Manual mode không hỗ trợ multi-pair
+            recovered_session_id = None
+        
+        # ─── PHÁT HIỆN & KHÔI PHỤC PHIÊN BỊ DỪNG ─────────────────────────
+        # Kiểm tra xem có phiên bị dừng chưa được khôi phục
+        interrupted_sessions = recovery.get_interrupted_sessions()
+        if interrupted_sessions and not no_recovery:
+            safe_print('')
+            recovered_session_id = recovery.show_interrupted_sessions()
+            
+            if recovered_session_id:
+                # Lấy thông tin khôi phục
+                recovery_info = recovery.get_recovery_info(recovered_session_id)
+                
+                if recovery_info:
+                    # Sử dụng thông tin từ phiên cũ để khôi phục
+                    mode = recovery_info['mode']
+                    symbol = recovery_info['symbol']
+                    usdt_amount = recovery_info['usdt_amount']
+                    renew_time = recovery_info['renew_time_minutes']
+                    exchanges = recovery_info['exchanges']
+                    
+                    log_info(f"Khôi phục phiên #{recovered_session_id}")
+                    log_info(f"Lợi nhuận trước đó: {recovery_info['cumulative_profit_pct']:.4f}%")
+                    
+                    # Tạo vốn mới từ balance file (hoặc sử dụng số dư cuối từ phiên cũ)
+                    try:
+                        with open('balance.txt', 'r') as f:
+                            usdt_amount = float(f.read().strip())
+                            log_info(f"Sử dụng balance từ balance.txt: {usdt_amount} USDT")
+                    except Exception as e:
+                        log_warning(f"Không thể đọc balance.txt, sử dụng vốn từ phiên cũ: {str(e)}")
+            else:
+                safe_print('')
+        
+        # ─── KẾT THÚC PHÁT HIỆN PHIÊN ─────────────────────────────────────
         
         # Kiểm tra chế độ
         if mode not in BOT_MODES:

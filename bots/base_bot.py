@@ -267,14 +267,17 @@ class BaseBot:
     async def process_orderbook(self, exchange_id: str, orderbook: dict[str, Any]) -> bool:
         """
         Xử lý dữ liệu sách lệnh nhận được từ sàn giao dịch.
-        
+
         Args:
             exchange_id (str): ID của sàn giao dịch
             orderbook (dict): Dữ liệu sách lệnh
-            
+
         Returns:
             bool: True nếu phát hiện cơ hội giao dịch, ngược lại False
         """
+        if not orderbook.get("bids") or not orderbook.get("asks"):
+            return False
+
         # Cập nhật giá mua và bán tốt nhất
         self.bid_prices[exchange_id] = orderbook["bids"][0][0]  # Giá mua cao nhất
         self.ask_prices[exchange_id] = orderbook["asks"][0][0]  # Giá bán thấp nhất
@@ -387,6 +390,10 @@ class BaseBot:
         Returns:
             bool: True nếu nên thực hiện giao dịch, ngược lại False
         """
+        # Bảo vệ: crypto_per_transaction phải được khởi tạo trước khi giao dịch
+        if self.crypto_per_transaction <= 0:
+            return False
+
         # Điều kiện cơ bản: sàn mua và bán phải khác nhau
         if min_ask_ex == max_bid_ex:
             return False

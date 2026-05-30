@@ -2,11 +2,38 @@
 Module quản lý ghi log của ứng dụng.
 """
 import os
+import sys
 import logging
 from datetime import datetime
 from typing import Any, Optional
 from colorama import Fore, Style
 from utils.helpers import show_time
+
+
+def configure_console_encoding() -> None:
+    """Cấu hình UTF-8 cho console khi môi trường hỗ trợ."""
+    for stream_name in ('stdin', 'stdout', 'stderr'):
+        stream = getattr(sys, stream_name, None)
+        if hasattr(stream, 'reconfigure'):
+            try:
+                stream.reconfigure(encoding='utf-8', errors='replace')
+            except (AttributeError, OSError, ValueError):
+                continue
+
+
+def safe_print(message: str) -> None:
+    """In ra console mà không làm crash khi terminal không hỗ trợ Unicode đầy đủ."""
+    stream = sys.stdout
+    try:
+        print(message)
+    except UnicodeEncodeError:
+        encoding = getattr(stream, 'encoding', None) or 'utf-8'
+        sanitized = message.encode(encoding, errors='replace').decode(encoding, errors='replace')
+        stream.write(sanitized + '\n')
+        stream.flush()
+
+
+configure_console_encoding()
 
 # Tạo thư mục logs nếu chưa tồn tại
 os.makedirs('logs', exist_ok=True)
@@ -18,17 +45,19 @@ log_file = f'logs/arbitrage_bot_{today}.log'
 # Tạo logger
 logger = logging.getLogger('arbitrage_bot')
 logger.setLevel(logging.DEBUG)
+logger.propagate = False
 
 # Tạo file handler để lưu log vào tệp tin
-file_handler = logging.FileHandler(log_file, encoding='utf-8')
-file_handler.setLevel(logging.DEBUG)
+if not logger.handlers:
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
 
-# Định dạng log
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
+    # Định dạng log
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
 
-# Thêm handler vào logger
-logger.addHandler(file_handler)
+    # Thêm handler vào logger
+    logger.addHandler(file_handler)
 
 
 def log_and_print(message: str, level: str = 'info', print_to_console: bool = True, telegram: Any = None) -> None:
@@ -47,7 +76,7 @@ def log_and_print(message: str, level: str = 'info', print_to_console: bool = Tr
     # Hiển thị ra màn hình nếu được yêu cầu
     if print_to_console:
         console_message = f"{Style.DIM}[{show_time()}]{Style.RESET_ALL} {message}"
-        print(console_message)
+        safe_print(console_message)
     
     # Gửi thông báo qua Telegram nếu có
     if telegram:

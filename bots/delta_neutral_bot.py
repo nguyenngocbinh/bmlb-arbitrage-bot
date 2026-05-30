@@ -85,7 +85,7 @@ class DeltaNeutralBot(BaseBot):
             
             # Kiểm tra số dư trên các sàn spot
             try:
-                self.balance_service.check_balances(
+                await self.balance_service.check_balances(
                     self.exchanges, 
                     'USDT', 
                     spot_investment, 
@@ -97,7 +97,7 @@ class DeltaNeutralBot(BaseBot):
             
             # Kiểm tra số dư trên sàn futures
             try:
-                futures_balance = self.balance_service.get_balance(self.futures_exchange, 'USDT')
+                futures_balance = await self.balance_service.get_balance(self.futures_exchange, 'USDT')
                 
                 # Nếu số dư trên sàn futures không đủ, chuyển tiền từ spot sang futures
                 if futures_balance < futures_investment:

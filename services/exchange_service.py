@@ -13,10 +13,37 @@ from utils.exceptions import ExchangeError, InsufficientBalanceError, FuturesErr
 from utils.helpers import calculate_average, extract_base_asset
 from services.rate_limiter import get_rate_limiter
 from configs import SUPPORTED_EXCHANGES
+import time
 
 # Tải biến môi trường
 load_dotenv()
 
+async def retry_with_backoff(func, *args, retries=3, backoff_in_seconds=1, **kwargs):
+    """
+    Thực hiện retry với backoff khi gọi hàm.
+
+    Args:
+        func (callable): Hàm cần gọi.
+        retries (int): Số lần thử lại tối đa.
+        backoff_in_seconds (int): Thời gian chờ ban đầu giữa các lần thử lại.
+        *args: Tham số truyền vào hàm.
+        **kwargs: Tham số keyword truyền vào hàm.
+
+    Returns:
+        Any: Kết quả trả về từ hàm.
+
+    Raises:
+        Exception: Nếu hết số lần thử lại mà vẫn thất bại.
+    """
+    for attempt in range(retries):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            log_error(f"Lỗi khi gọi hàm {func.__name__}: {str(e)}. Thử lại ({attempt + 1}/{retries})...")
+            if attempt < retries - 1:
+                await asyncio.sleep(backoff_in_seconds * (2 ** attempt))
+            else:
+                raise
 
 class ExchangeService:
     """
@@ -27,41 +54,70 @@ class ExchangeService:
         """Khởi tạo dịch vụ sàn giao dịch."""
         self.exchanges = {}
         self.exchange_instances = {}
+        self._use_sandbox = os.getenv('USE_SANDBOX', 'false').lower() == 'true'
         self._rate_limiter = get_rate_limiter()
         self._initialize_exchanges()
+
+    def _apply_sandbox_mode(self, exchange: Any, exchange_id: str) -> None:
+        """Bật sandbox mode nếu cấu hình môi trường yêu cầu."""
+        if not self._use_sandbox:
+            return
+
+        if hasattr(exchange, 'set_sandbox_mode'):
+            exchange.set_sandbox_mode(True)
+            log_info(f"Đã bật sandbox mode cho {exchange_id}")
+
+    def _get_env_value(self, prod_key: str, testnet_key: str) -> Optional[str]:
+        """Lấy giá trị env, ưu tiên key testnet khi bật sandbox."""
+        if self._use_sandbox:
+            testnet_value = os.getenv(testnet_key)
+            if testnet_value:
+                return testnet_value
+        return os.getenv(prod_key)
     
     def _initialize_exchanges(self) -> None:
         """Khởi tạo đối tượng sàn giao dịch với thông tin xác thực từ biến môi trường."""
         for exchange_id in SUPPORTED_EXCHANGES:
             self.exchanges[exchange_id] = {'enableRateLimit': True}
 
+        binance_api_key = self._get_env_value('BINANCE_API_KEY', 'BINANCE_TESTNET_API_KEY')
+        binance_secret = self._get_env_value('BINANCE_SECRET', 'BINANCE_TESTNET_SECRET')
+        kucoin_api_key = self._get_env_value('KUCOIN_API_KEY', 'KUCOIN_TESTNET_API_KEY')
+        kucoin_secret = self._get_env_value('KUCOIN_SECRET', 'KUCOIN_TESTNET_SECRET')
+        kucoin_password = self._get_env_value('KUCOIN_PASSWORD', 'KUCOIN_TESTNET_PASSWORD')
+        bybit_api_key = self._get_env_value('BYBIT_API_KEY', 'BYBIT_TESTNET_API_KEY')
+        bybit_secret = self._get_env_value('BYBIT_SECRET', 'BYBIT_TESTNET_SECRET')
+        okx_api_key = self._get_env_value('OKX_API_KEY', 'OKX_TESTNET_API_KEY')
+        okx_secret = self._get_env_value('OKX_SECRET', 'OKX_TESTNET_SECRET')
+        okx_password = self._get_env_value('OKX_PASSWORD', 'OKX_TESTNET_PASSWORD')
+
         # Khởi tạo Binance
-        if os.getenv('BINANCE_API_KEY') and os.getenv('BINANCE_SECRET'):
+        if binance_api_key and binance_secret:
             self.exchanges['binance'] = {
-                'apiKey': os.getenv('BINANCE_API_KEY'),
-                'secret': os.getenv('BINANCE_SECRET'),
+                'apiKey': binance_api_key,
+                'secret': binance_secret,
                 'options': {'createMarketBuyOrderRequiresPrice': False}
             }
         
         # Khởi tạo KuCoin
-        if os.getenv('KUCOIN_API_KEY') and os.getenv('KUCOIN_SECRET') and os.getenv('KUCOIN_PASSWORD'):
+        if kucoin_api_key and kucoin_secret and kucoin_password:
             self.exchanges['kucoin'] = {
-                'apiKey': os.getenv('KUCOIN_API_KEY'),
-                'secret': os.getenv('KUCOIN_SECRET'),
-                'password': os.getenv('KUCOIN_PASSWORD'),
+                'apiKey': kucoin_api_key,
+                'secret': kucoin_secret,
+                'password': kucoin_password,
                 'options': {'createMarketBuyOrderRequiresPrice': False}
             }
             self.exchanges['kucoinfutures'] = {
-                'apiKey': os.getenv('KUCOIN_API_KEY'),
-                'secret': os.getenv('KUCOIN_SECRET'),
-                'password': os.getenv('KUCOIN_PASSWORD')
+                'apiKey': kucoin_api_key,
+                'secret': kucoin_secret,
+                'password': kucoin_password
             }
         
         # Khởi tạo Bybit
-        if os.getenv('BYBIT_API_KEY') and os.getenv('BYBIT_SECRET'):
+        if bybit_api_key and bybit_secret:
             self.exchanges['bybit'] = {
-                'apiKey': os.getenv('BYBIT_API_KEY'),
-                'secret': os.getenv('BYBIT_SECRET'),
+                'apiKey': bybit_api_key,
+                'secret': bybit_secret,
                 'options': {
                     'defaultType': 'spot',
                     'createMarketBuyOrderRequiresPrice': False
@@ -69,11 +125,11 @@ class ExchangeService:
             }
         
         # Khởi tạo OKX
-        if os.getenv('OKX_API_KEY') and os.getenv('OKX_SECRET') and os.getenv('OKX_PASSWORD'):
+        if okx_api_key and okx_secret and okx_password:
             self.exchanges['okx'] = {
-                'apiKey': os.getenv('OKX_API_KEY'),
-                'secret': os.getenv('OKX_SECRET'),
-                'password': os.getenv('OKX_PASSWORD'),
+                'apiKey': okx_api_key,
+                'secret': okx_secret,
+                'password': okx_password,
                 'options': {'createMarketBuyOrderRequiresPrice': False}
             }
     
@@ -98,18 +154,20 @@ class ExchangeService:
                 # Tạo đối tượng sàn giao dịch
                 exchange_class = getattr(ccxt, exchange_id)
                 self.exchange_instances[exchange_id] = exchange_class(self.exchanges[exchange_id])
+                self._apply_sandbox_mode(self.exchange_instances[exchange_id], exchange_id)
                 log_info(f"Đã khởi tạo sàn giao dịch {exchange_id}")
             except Exception as e:
                 raise ExchangeError(exchange_id, f"Không thể khởi tạo sàn giao dịch: {str(e)}")
         
         return self.exchange_instances[exchange_id]
 
-    async def get_pro_exchange(self, exchange_id: str) -> Any:
+    async def get_pro_exchange(self, exchange_id: str, public_only: bool = False) -> Any:
         """
         Lấy đối tượng sàn giao dịch ccxt.pro theo id.
         
         Args:
             exchange_id (str): ID của sàn giao dịch
+            public_only (bool): Chỉ dùng endpoint public, không gửi credential
         
         Returns:
             object: Đối tượng sàn giao dịch ccxt.pro đã được khởi tạo
@@ -117,17 +175,12 @@ class ExchangeService:
         Raises:
             ExchangeError: Nếu sàn giao dịch không tồn tại hoặc không được hỗ trợ
         """
-        if exchange_id not in self.exchanges:
-            raise ExchangeError(exchange_id, "Sàn giao dịch không được hỗ trợ hoặc chưa được cấu hình")
-        
         try:
-            # Tạo đối tượng sàn giao dịch pro
-            exchange_class = getattr(ccxt.pro, exchange_id)
-            return exchange_class(self.exchanges[exchange_id])
+            return await self._get_or_create_pro_exchange(exchange_id, public_only=public_only)
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể khởi tạo sàn giao dịch pro: {str(e)}")
     
-    def get_balance(self, exchange_id: str, symbol: str) -> dict[str, float]:
+    async def get_balance(self, exchange_id: str, symbol: str) -> dict[str, float]:
         """
         Lấy số dư của một tài sản trên sàn giao dịch.
         
@@ -142,38 +195,39 @@ class ExchangeService:
             ExchangeError: Nếu có lỗi khi lấy số dư
         """
         exchange = self.get_exchange(exchange_id)
-        
+
+        async def fetch():
+            return exchange.fetch_balance()
+
         try:
-            # Làm sạch symbol nếu nó có dạng BTC/USDT hoặc BTC:USDT
-            clean_symbol = extract_base_asset(symbol) if symbol != 'USDT' else 'USDT'
-            
-            balance = exchange.fetch_balance()
-            
-            if clean_symbol in balance['free'] and balance['free'][clean_symbol] != 0:
-                return balance['free'][clean_symbol]
-            return 0
+            return await retry_with_backoff(fetch)
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể lấy số dư của {symbol}: {str(e)}")
     
-    def get_ticker(self, exchange_id: str, symbol: str) -> dict[str, Any]:
+    async def get_ticker(self, exchange_id: str, symbol: str) -> dict[str, Any]:
         """
-        Lấy thông tin ticker của một cặp giao dịch.
-        
+        Lấy thông tin ticker của một cặp giao dịch với retry.
+
         Args:
             exchange_id (str): ID của sàn giao dịch
             symbol (str): Ký hiệu của cặp giao dịch
-        
+
         Returns:
             dict: Thông tin ticker
-        
+
         Raises:
             ExchangeError: Nếu có lỗi khi lấy ticker
         """
         exchange = self.get_exchange(exchange_id)
-        
-        try:
+
+        async def fetch_ticker():
             return exchange.fetch_ticker(symbol)
+
+        try:
+            log_info(f"Đang gọi API get_ticker cho {exchange_id} với cặp {symbol}...")
+            return await retry_with_backoff(fetch_ticker)
         except Exception as e:
+            log_error(f"Lỗi khi gọi API get_ticker cho {exchange_id} với cặp {symbol}: {str(e)}")
             raise ExchangeError(exchange_id, f"Không thể lấy ticker cho {symbol}: {str(e)}")
     
     def create_limit_buy_order(self, exchange_id: str, symbol: str, amount: float,
@@ -194,8 +248,9 @@ class ExchangeService:
             ExchangeError: Nếu có lỗi khi tạo lệnh
         """
         exchange = self.get_exchange(exchange_id)
-        
+
         try:
+            self._rate_limiter.acquire(exchange_id)
             return exchange.create_limit_buy_order(symbol, amount, price)
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể tạo lệnh mua giới hạn cho {symbol}: {str(e)}")
@@ -218,8 +273,9 @@ class ExchangeService:
             ExchangeError: Nếu có lỗi khi tạo lệnh
         """
         exchange = self.get_exchange(exchange_id)
-        
+
         try:
+            self._rate_limiter.acquire(exchange_id)
             return exchange.create_limit_sell_order(symbol, amount, price)
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể tạo lệnh bán giới hạn cho {symbol}: {str(e)}")
@@ -243,8 +299,9 @@ class ExchangeService:
         """
         exchange = self.get_exchange(exchange_id)
         params = params or {}
-        
+
         try:
+            self._rate_limiter.acquire(exchange_id)
             return exchange.create_market_buy_order(symbol, amount, params)
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể tạo lệnh mua thị trường cho {symbol}: {str(e)}")
@@ -268,8 +325,9 @@ class ExchangeService:
         """
         exchange = self.get_exchange(exchange_id)
         params = params or {}
-        
+
         try:
+            self._rate_limiter.acquire(exchange_id)
             return exchange.create_market_sell_order(symbol, amount, params)
         except Exception as e:
             raise ExchangeError(exchange_id, f"Không thể tạo lệnh bán thị trường cho {symbol}: {str(e)}")
@@ -414,7 +472,7 @@ class ExchangeService:
         
         try:
             for exchange_id in exchanges:
-                ticker = self.get_ticker(exchange_id, symbol)
+                ticker = await self.get_ticker(exchange_id, symbol)
                 all_tickers.append(ticker['bid'])
                 all_tickers.append(ticker['ask'])
             
@@ -559,26 +617,53 @@ class ExchangeService:
     # ─── Async Methods ────────────────────────────────────────────────
     # Các phương thức async sử dụng ccxt.pro cho đặt lệnh đồng thời
 
-    async def _get_or_create_pro_exchange(self, exchange_id: str) -> Any:
+    def _build_pro_exchange_config(self, exchange_id: str, public_only: bool = False) -> dict[str, Any]:
+        """
+        Tạo cấu hình cho ccxt.pro.
+
+        Args:
+            exchange_id (str): ID của sàn giao dịch
+            public_only (bool): Chỉ giữ lại cấu hình cần thiết cho endpoint public
+
+        Returns:
+            dict: Cấu hình dùng để khởi tạo client ccxt.pro
+        """
+        config = dict(self.exchanges[exchange_id])
+        if not public_only:
+            return config
+
+        public_config = {
+            'enableRateLimit': config.get('enableRateLimit', True)
+        }
+        if 'options' in config:
+            public_config['options'] = dict(config['options'])
+        return public_config
+
+    async def _get_or_create_pro_exchange(self, exchange_id: str, public_only: bool = False) -> Any:
         """
         Lấy hoặc tạo đối tượng sàn giao dịch ccxt.pro dùng lại được.
         
         Args:
             exchange_id (str): ID của sàn giao dịch
+            public_only (bool): Chỉ dùng endpoint public, không gửi credential
         
         Returns:
             object: Đối tượng sàn giao dịch ccxt.pro
         """
         if not hasattr(self, '_pro_instances'):
             self._pro_instances = {}
+
+        instance_key = f"{exchange_id}:public" if public_only else exchange_id
         
-        if exchange_id not in self._pro_instances:
+        if instance_key not in self._pro_instances:
             if exchange_id not in self.exchanges:
                 raise ExchangeError(exchange_id, "Sàn giao dịch không được hỗ trợ hoặc chưa được cấu hình")
             exchange_class = getattr(ccxt.pro, exchange_id)
-            self._pro_instances[exchange_id] = exchange_class(self.exchanges[exchange_id])
+            exchange_config = self._build_pro_exchange_config(exchange_id, public_only=public_only)
+            self._pro_instances[instance_key] = exchange_class(exchange_config)
+            self._apply_sandbox_mode(self._pro_instances[instance_key], exchange_id)
         
-        return self._pro_instances[exchange_id]
+        return self._pro_instances[instance_key]
 
     async def close_all_pro_exchanges(self):
         """Đóng tất cả kết nối ccxt.pro."""

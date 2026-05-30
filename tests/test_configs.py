@@ -38,8 +38,8 @@ class TestConfigs:
         assert "delta-neutral" in BOT_MODES
 
     def test_first_orders_fill_timeout_is_seconds(self):
-        # FIRST_ORDERS_FILL_TIMEOUT should be in seconds (3600 = 1 hour)
-        assert FIRST_ORDERS_FILL_TIMEOUT == 3600
+        # FIRST_ORDERS_FILL_TIMEOUT should be in seconds (300 = 5 phút — đủ cho arbitrage)
+        assert FIRST_ORDERS_FILL_TIMEOUT == 300
 
     def test_file_paths(self):
         assert BALANCE_FILE == "balance.txt"
