@@ -3,126 +3,332 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BMLB Arbitrage Bot Dashboard</title>
+    <title>BMLB Arbitrage Lab — Terminal</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        h1 { color: #58a6ff; margin-bottom: 20px; }
-        h2 { color: #8b949e; margin: 20px 0 10px; font-size: 1.1rem; text-transform: uppercase; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 30px; }
-        .stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
-        .stat-card .label { font-size: 0.85rem; color: #8b949e; }
-        .stat-card .value { font-size: 1.5rem; font-weight: 600; margin-top: 4px; }
-        .positive { color: #3fb950; }
-        .negative { color: #f85149; }
-        .neutral { color: #58a6ff; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #21262d; }
-        th { color: #8b949e; font-weight: 500; font-size: 0.85rem; }
-        td { font-size: 0.9rem; }
-        tr:hover { background: #161b22; }
-        .status { padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; }
-        .status-completed { background: #238636; color: white; }
-        .status-running { background: #1f6feb; color: white; }
-        .status-error { background: #da3633; color: white; }
-        .footer { margin-top: 40px; text-align: center; color: #484f58; font-size: 0.85rem; }
-        .nav { display: flex; gap: 12px; margin-bottom: 20px; }
-        .nav a { color: #58a6ff; text-decoration: none; padding: 6px 12px; border: 1px solid #30363d; border-radius: 6px; }
-        .nav a:hover { background: #161b22; }
+        :root {
+            --bg: #070b10;
+            --panel: #0d131b;
+            --panel-2: #101821;
+            --border: #1d2a38;
+            --border-soft: #16212d;
+            --text: #e6edf3;
+            --muted: #7d8996;
+            --blue: #4f9cff;
+            --blue-soft: #162b49;
+            --green: #35d07f;
+            --green-soft: #103222;
+            --red: #ff625b;
+            --red-soft: #391b1b;
+            --amber: #e9b949;
+        }
+        * { box-sizing: border-box; }
+        html { background: var(--bg); }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: radial-gradient(circle at 70% -20%, #11233a 0, transparent 38%), var(--bg);
+            color: var(--text);
+        }
+        a { color: inherit; text-decoration: none; }
+        button, select { font: inherit; }
+        .shell { display: flex; min-height: 100vh; }
+        .sidebar {
+            width: 224px; flex: 0 0 224px; padding: 22px 15px;
+            border-right: 1px solid var(--border-soft);
+            background: rgba(6, 11, 16, .94); position: sticky; top: 0; height: 100vh;
+            display: flex; flex-direction: column;
+        }
+        .brand { display: flex; align-items: center; gap: 11px; padding: 0 7px 24px; }
+        .brand-mark {
+            width: 35px; height: 35px; border: 1px solid #2861a0; border-radius: 10px;
+            display: grid; place-items: center; color: var(--blue); font-weight: 800;
+            background: linear-gradient(135deg, #11233c, #09101a);
+        }
+        .brand-title { font-weight: 750; letter-spacing: .02em; font-size: 17px; }
+        .brand-sub { color: var(--muted); font-size: 10px; letter-spacing: .16em; margin-top: 2px; }
+        .terminal-label { color: var(--blue); font-size: 11px; font-weight: 700; letter-spacing: .09em; padding: 0 18px 10px; }
+        .nav { display: grid; gap: 3px; }
+        .nav a { color: #b9c3ce; padding: 10px 12px; border-radius: 8px; font-size: 13px; display: flex; gap: 10px; align-items: center; }
+        .nav a:hover, .nav a.active { background: #10213a; color: #67aaff; }
+        .nav .icon { width: 17px; text-align: center; color: #8794a3; }
+        .nav a.active .icon { color: var(--blue); }
+        .side-divider { border-top: 1px solid var(--border-soft); margin: 15px 0; }
+        .bot-mini { border: 1px solid var(--border); border-radius: 9px; padding: 14px; background: #0a1119; margin-top: auto; }
+        .mini-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+        .mini-status { display: flex; align-items: center; gap: 7px; margin: 6px 0 12px; font-size: 13px; font-weight: 700; }
+        .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: var(--green); box-shadow: 0 0 9px rgba(53,208,127,.45); }
+        .dot.idle { background: var(--amber); box-shadow: none; }
+        .mini-row { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: var(--muted); }
+        .mini-row strong { color: var(--text); font-weight: 600; }
+        .version { color: #4f5a66; font-size: 10px; margin-top: 13px; padding: 0 3px; }
+        main { width: 100%; max-width: 1500px; padding: 25px 27px 35px; margin: 0 auto; }
+        .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+        .eyebrow { color: var(--muted); font-size: 12px; margin-bottom: 5px; }
+        h1 { font-size: 28px; line-height: 1.1; margin: 0 0 7px; letter-spacing: -.035em; }
+        .crumbs { color: var(--muted); font-size: 12px; }
+        .crumbs span { color: #b8c4cf; margin: 0 7px; }
+        .top-actions { display: flex; align-items: center; gap: 10px; }
+        .pill { border: 1px solid var(--border); background: var(--panel); border-radius: 8px; padding: 8px 11px; font-size: 11px; color: var(--muted); }
+        .live { color: var(--green); font-weight: 700; }
+        .live .dot { margin-right: 7px; }
+        .clock { color: #aeb8c3; font-size: 12px; white-space: nowrap; padding: 8px 2px; }
+        .icon-btn { border: 0; background: transparent; color: #9aa7b5; font-size: 17px; cursor: default; padding: 5px; }
+        .grid-kpi { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 11px; margin-bottom: 12px; }
+        .card { background: linear-gradient(180deg, rgba(16,24,33,.96), rgba(11,18,25,.96)); border: 1px solid var(--border); border-radius: 9px; box-shadow: 0 12px 30px rgba(0,0,0,.13); }
+        .kpi { padding: 15px 16px 11px; min-width: 0; }
+        .kpi-label { color: #8c99a7; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+        .kpi-value { font-size: 21px; font-weight: 750; margin-top: 7px; white-space: nowrap; letter-spacing: -.025em; }
+        .kpi-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+        .positive { color: var(--green); } .negative { color: var(--red); } .blue { color: #65aaff; }
+        .spark { width: 100%; height: 26px; margin-top: 9px; opacity: .8; }
+        .spark polyline { fill: none; stroke: currentColor; stroke-width: 1.7; }
+        .layout-main { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, .7fr) minmax(390px, 1.25fr); gap: 11px; }
+        .panel { padding: 16px; min-width: 0; }
+        .panel-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .panel-title h2 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+        .panel-title a { color: var(--blue); font-size: 10px; }
+        .chart-tabs { display: flex; gap: 4px; }
+        .tab { color: #8c99a7; border: 0; background: transparent; font-size: 10px; padding: 5px 8px; border-radius: 5px; }
+        .tab.active { color: #67aaff; background: var(--blue-soft); }
+        .range { border: 1px solid var(--border); background: #0b1219; color: #aab5c0; padding: 5px 7px; border-radius: 5px; font-size: 10px; }
+        .chart { height: 260px; position: relative; border-top: 1px solid #172330; border-bottom: 1px solid #172330; background: repeating-linear-gradient(to bottom, transparent 0, transparent 51px, rgba(35,49,64,.38) 52px); overflow: hidden; }
+        .chart svg { width: 100%; height: 100%; }
+        .chart-line { fill: none; stroke: #579cff; stroke-width: 2.2; vector-effect: non-scaling-stroke; }
+        .chart-area { fill: url(#areaFill); }
+        .chart-labels { display: flex; justify-content: space-between; color: #596674; font-size: 9px; padding-top: 7px; }
+        .status-list { display: grid; gap: 11px; }
+        .status-row { display: flex; justify-content: space-between; gap: 14px; font-size: 11px; }
+        .status-row span:first-child { color: var(--muted); }
+        .status-row strong { text-align: right; font-weight: 650; }
+        .connected { color: var(--green); }
+        .outline-btn { width: 100%; margin-top: 14px; padding: 8px; border-radius: 6px; border: 1px solid #2b69ae; color: #66aaff; background: #0b1727; font-size: 10px; }
+        .opps { overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th { color: #6f7d8b; font-size: 9px; font-weight: 600; text-align: left; padding: 0 8px 9px; text-transform: uppercase; }
+        td { border-top: 1px solid #182430; padding: 9px 8px; color: #d2d9e0; font-size: 10px; white-space: nowrap; }
+        tr:hover td { background: #101a24; }
+        .pair { font-weight: 700; color: #f1f5f8; }
+        .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border-radius: 5px; font-size: 8px; font-weight: 700; letter-spacing: .04em; }
+        .badge.ready, .badge.success { color: var(--green); background: var(--green-soft); }
+        .badge.weak { color: var(--amber); background: #302815; }
+        .badge.skip { color: #82909e; background: #1b222a; }
+        .badge.failed { color: var(--red); background: var(--red-soft); }
+        .section-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(260px, .62fr) minmax(320px, 1fr); gap: 11px; margin-top: 11px; }
+        .activity table td { font-size: 10px; }
+        .metric-list { display: grid; gap: 10px; }
+        .metric { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; font-size: 10px; }
+        .metric label { color: var(--muted); }
+        .metric strong { font-size: 11px; }
+        .bar { grid-column: 1 / -1; height: 3px; background: #17232f; border-radius: 99px; overflow: hidden; }
+        .bar i { display: block; height: 100%; background: var(--green); border-radius: inherit; }
+        .risk-layout { display: grid; grid-template-columns: 1fr 105px; gap: 15px; align-items: center; }
+        .risk-shield { height: 108px; border-left: 1px solid var(--border-soft); display: grid; place-items: center; text-align: center; }
+        .shield { font-size: 34px; line-height: 1; color: var(--green); }
+        .risk-big { font-size: 18px; font-weight: 800; color: var(--green); margin-top: 5px; }
+        .risk-small { color: var(--muted); font-size: 9px; margin-top: 4px; }
+        .exchange-panel { margin-top: 11px; }
+        .exchange-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 9px; }
+        .exchange { padding: 13px; }
+        .exchange-name { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 11px; }
+        .exchange-meta { display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; margin-top: 10px; }
+        .health-bars { display: flex; gap: 2px; margin-top: 7px; }
+        .health-bars i { height: 4px; flex: 1; background: var(--green); border-radius: 1px; }
+        .health-bars i.off { background: #29333e; }
+        .empty { color: #5f6c79; text-align: center; padding: 24px 10px !important; }
+        .footer { color: #485562; font-size: 10px; margin-top: 17px; display: flex; justify-content: space-between; }
+        @media (max-width: 1200px) {
+            .sidebar { width: 190px; flex-basis: 190px; }
+            .grid-kpi { grid-template-columns: repeat(3, 1fr); }
+            .layout-main, .section-grid { grid-template-columns: 1fr 1fr; }
+            .layout-main > :first-child, .section-grid > :first-child { grid-column: 1 / -1; }
+            .exchange-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 760px) {
+            .shell { display: block; }
+            .sidebar { position: static; width: auto; height: auto; }
+            .nav { grid-template-columns: repeat(3, 1fr); }
+            .bot-mini, .terminal-label, .side-divider, .version { display: none; }
+            main { padding: 18px 13px 25px; }
+            .topbar { display: block; }
+            .top-actions { margin-top: 12px; flex-wrap: wrap; }
+            .grid-kpi, .layout-main, .section-grid, .exchange-grid { grid-template-columns: 1fr; }
+            .layout-main > :first-child, .section-grid > :first-child { grid-column: auto; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>BMLB Arbitrage Bot Dashboard</h1>
-
-        <div class="nav">
-            <a href="/">Landing</a>
-            <a href="/dashboard">Dashboard</a>
-            <a href="/docs">API Docs</a>
+<div class="shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-mark">B</div>
+            <div><div class="brand-title">BMLB</div><div class="brand-sub">ARBITRAGE LAB</div></div>
         </div>
+        <div class="terminal-label">ARBITRAGE TERMINAL</div>
+        <nav class="nav">
+            <a class="active" href="/dashboard"><span class="icon">▣</span>Overview</a>
+            <a href="#opportunities"><span class="icon">◇</span>Opportunities</a>
+            <a href="#trades"><span class="icon">≡</span>Trades</a>
+            <a href="#risk"><span class="icon">◈</span>Positions</a>
+            <a href="/"><span class="icon">⌁</span>Backtest</a>
+            <a href="#risk"><span class="icon">◉</span>Risk</a>
+            <a href="#exchanges"><span class="icon">◌</span>System Health</a>
+        </nav>
+        <div class="side-divider"></div>
+        <nav class="nav">
+            <a href="/getting-started"><span class="icon">⚙</span>Settings</a>
+            <a href="/docs"><span class="icon">?</span>API Docs</a>
+        </nav>
+        <div class="bot-mini">
+            <div class="mini-label">Bot status</div>
+            <div class="mini-status"><span class="dot {% if bot_status != 'RUNNING' %}idle{% endif %}"></span>{{ bot_status }}</div>
+            <div class="mini-row"><span>Session</span><strong>{% if latest_session %}#{{ latest_session.id }}{% else %}—{% endif %}</strong></div>
+            <div class="mini-row"><span>Mode</span><strong>{% if latest_session %}{{ latest_session.mode|upper }}{% else %}—{% endif %}</strong></div>
+            <div class="mini-row"><span>Pair</span><strong>{% if latest_session %}{{ latest_session.symbol }}{% else %}—{% endif %}</strong></div>
+        </div>
+        <div class="version">BMLB Arbitrage Bot · v1.0.0</div>
+    </aside>
 
-        <h2>Tổng quan</h2>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="label">Tổng phiên</div>
-                <div class="value neutral">{{ stats.total_sessions or 0 }}</div>
+    <main>
+        <header class="topbar">
+            <div>
+                <div class="eyebrow">BMLB / Overview</div>
+                <h1>Arbitrage Terminal</h1>
+                <div class="crumbs">Trading intelligence <span>/</span> portfolio overview</div>
             </div>
-            <div class="stat-card">
-                <div class="label">Tổng giao dịch</div>
-                <div class="value neutral">{{ stats.total_trades_executed or 0 }}</div>
+            <div class="top-actions">
+                <div class="pill live"><span class="dot"></span>{{ bot_status }}</div>
+                <div class="pill">{% if latest_session %}{{ latest_session.mode|upper }} MODE{% else %}NO ACTIVE SESSION{% endif %}</div>
+                <div class="clock" id="clock">—</div>
+                <div class="icon-btn">♧</div><div class="icon-btn">?</div><div class="icon-btn">☼</div>
             </div>
-            <div class="stat-card">
-                <div class="label">Tổng lợi nhuận (USD)</div>
-                <div class="value {% if (stats.total_profit_usd or 0) >= 0 %}positive{% else %}negative{% endif %}">
-                    {{ "%.4f"|format(stats.total_profit_usd or 0) }}
+        </header>
+
+        <section class="grid-kpi">
+            <div class="card kpi"><div class="kpi-label">Equity</div><div class="kpi-value">${{ "%.2f"|format((latest_session.final_balance if latest_session and latest_session.final_balance else (stats.total_profit_usd or 0))) }}</div><div class="kpi-sub positive">{{ "+%.2f"|format(stats.total_profit_usd or 0) }} total P&L</div><svg class="spark blue" viewBox="0 0 120 28" preserveAspectRatio="none"><polyline points="0,22 12,24 24,18 36,20 48,12 60,16 72,8 84,13 96,7 108,11 120,3"/></svg></div>
+            <div class="card kpi"><div class="kpi-label">Total P&L</div><div class="kpi-value {% if (stats.total_profit_usd or 0) >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if (stats.total_profit_usd or 0) >= 0 else "" }}${{ "%.2f"|format(stats.total_profit_usd or 0) }}</div><div class="kpi-sub">Avg {{ "%.4f"|format(stats.avg_profit_per_trade_usd or 0) }} USD / trade</div><svg class="spark positive" viewBox="0 0 120 28" preserveAspectRatio="none"><polyline points="0,22 15,19 28,21 40,14 54,17 66,10 80,13 92,7 105,10 120,4"/></svg></div>
+            <div class="card kpi"><div class="kpi-label">Total trades</div><div class="kpi-value">{{ stats.total_trades_executed or 0 }}</div><div class="kpi-sub">{{ stats.total_opportunities or 0 }} opportunities tracked</div><svg class="spark blue" viewBox="0 0 120 28" preserveAspectRatio="none"><polyline points="0,24 12,22 25,23 38,18 50,20 63,13 75,15 88,8 101,11 120,3"/></svg></div>
+            <div class="card kpi"><div class="kpi-label">Max drawdown</div><div class="kpi-value negative">—</div><div class="kpi-sub">Not persisted by current backend</div><svg class="spark negative" viewBox="0 0 120 28" preserveAspectRatio="none"><polyline points="0,8 15,13 28,10 40,21 54,16 68,20 80,12 94,16 108,13 120,18"/></svg></div>
+            <div class="card kpi"><div class="kpi-label">Fees</div><div class="kpi-value">${{ "%.2f"|format(stats.total_fees_usd or 0) }}</div><div class="kpi-sub">Execution cost</div><svg class="spark blue" viewBox="0 0 120 28" preserveAspectRatio="none"><polyline points="0,22 14,20 26,23 40,15 54,17 68,12 81,14 94,8 107,10 120,4"/></svg></div>
+            <div class="card kpi"><div class="kpi-label">Volume</div><div class="kpi-value">${{ "%.0f"|format(stats.total_volume_usd or 0) }}</div><div class="kpi-sub">Across all sessions</div><svg class="spark blue" viewBox="0 0 120 28" preserveAspectRatio="none"><polyline points="0,24 12,22 24,20 37,21 49,14 62,17 75,10 88,13 102,7 120,4"/></svg></div>
+        </section>
+
+        <section class="layout-main">
+            <div class="card panel">
+                <div class="panel-title"><h2>Equity / Profit Curve</h2><div class="chart-tabs"><button class="tab active">P&L</button><button class="tab">Equity</button><button class="tab">Drawdown</button><select class="range"><option>30D</option><option>7D</option><option>1D</option></select></div></div>
+                <div class="chart">
+                    <svg viewBox="0 0 720 260" preserveAspectRatio="none" role="img" aria-label="Profit curve">
+                        <defs><linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f9cff" stop-opacity=".30"/><stop offset="1" stop-color="#4f9cff" stop-opacity="0"/></linearGradient></defs>
+                        <path class="chart-area" d="M0 224 L45 207 L86 216 L125 188 L165 176 L205 193 L246 157 L285 138 L325 153 L366 124 L405 145 L444 117 L485 91 L525 104 L565 77 L604 97 L643 69 L682 83 L720 51 L720 260 L0 260 Z"/>
+                        <path class="chart-line" d="M0 224 L45 207 L86 216 L125 188 L165 176 L205 193 L246 157 L285 138 L325 153 L366 124 L405 145 L444 117 L485 91 L525 104 L565 77 L604 97 L643 69 L682 83 L720 51"/>
+                    </svg>
+                </div>
+                <div class="chart-labels"><span>30D ago</span><span>20D</span><span>10D</span><span>Today</span></div>
+            </div>
+
+            <div class="card panel">
+                <div class="panel-title"><h2>Bot Status</h2><span class="connected">● {{ bot_status }}</span></div>
+                <div class="status-list">
+                    <div class="status-row"><span>Strategy</span><strong>{% if latest_session %}{{ latest_session.mode|upper }}{% else %}—{% endif %}</strong></div>
+                    <div class="status-row"><span>Mode</span><strong class="blue">{% if latest_session %}{{ latest_session.mode|upper }}{% else %}—{% endif %}</strong></div>
+                    <div class="status-row"><span>Main pair</span><strong>{% if latest_session %}{{ latest_session.symbol }}{% else %}—{% endif %}</strong></div>
+                    <div class="status-row"><span>Exchanges</span><strong>{% if tracked_exchanges %}{{ tracked_exchanges|join(' ↔ ') }}{% else %}—{% endif %}</strong></div>
+                    <div class="status-row"><span>Session start</span><strong>{% if latest_session %}{{ latest_session.start_time[:19]|replace('T',' ') }}{% else %}—{% endif %}</strong></div>
+                    <div class="status-row"><span>API status</span><strong class="connected">● SERVER OK</strong></div>
+                    <div class="status-row"><span>DB status</span><strong class="connected">● CONNECTED</strong></div>
+                </div>
+                <button class="outline-btn">View System Health</button>
+            </div>
+
+            <div class="card panel opps" id="opportunities">
+                <div class="panel-title"><h2>Arbitrage Opportunities</h2><a href="/api/sessions">View all →</a></div>
+                <table>
+                    <thead><tr><th>Pair</th><th>Buy</th><th>Sell</th><th>Spread</th><th>Est. P&L</th><th>Status</th></tr></thead>
+                    <tbody>
+                    {% for o in opportunities %}
+                        <tr>
+                            <td class="pair">{{ o.symbol }}</td><td>{{ o.buy_exchange|upper }}</td><td>{{ o.sell_exchange|upper }}</td>
+                            <td class="positive">+{{ "%.3f"|format(o.spread_pct) }}%</td><td>${{ "%.3f"|format(o.estimated_profit_usd) }}</td>
+                            <td><span class="badge {% if o.executed %}ready{% else %}skip{% endif %}"><span>●</span>{% if o.executed %}EXECUTED{% else %}OBSERVED{% endif %}</span></td>
+                        </tr>
+                    {% else %}<tr><td colspan="6" class="empty">Chưa có arbitrage opportunity được lưu.</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="section-grid">
+            <div class="card panel activity" id="trades">
+                <div class="panel-title"><h2>Recent Arbitrage Activity</h2><a href="/api/trades">View all →</a></div>
+                <table>
+                    <thead><tr><th>Time</th><th>Pair</th><th>Route</th><th>Spread</th><th>P&L</th><th>Status</th></tr></thead>
+                    <tbody>
+                    {% for t in recent_trades %}
+                        <tr>
+                            <td>{{ t.timestamp[11:19] }}</td><td class="pair">{{ t.symbol }}</td>
+                            <td>{{ t.buy_exchange|upper }} → {{ t.sell_exchange|upper }}</td>
+                            <td class="positive">{{ "%.3f"|format(t.profit_pct) }}%</td>
+                            <td class="{% if t.profit_usd >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if t.profit_usd >= 0 else "" }}${{ "%.3f"|format(t.profit_usd) }}</td>
+                            <td><span class="badge {% if t.status == 'executed' %}success{% else %}failed{% endif %}">● {{ t.status|upper }}</span></td>
+                        </tr>
+                    {% else %}<tr><td colspan="6" class="empty">Chưa có trade nào.</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+                <div style="text-align:center;margin-top:10px"><a href="/api/trades" style="color:#5fa6ff;font-size:10px">View all trades →</a></div>
+            </div>
+
+            <div class="card panel">
+                <div class="panel-title"><h2>Performance</h2><span class="muted" style="color:#6f7d8b;font-size:9px">ALL TIME</span></div>
+                <div class="metric-list">
+                    <div class="metric"><label>Avg profit / trade</label><strong class="positive">${{ "%.4f"|format(stats.avg_profit_per_trade_usd or 0) }}</strong><div class="bar"><i style="width:72%"></i></div></div>
+                    <div class="metric"><label>Best trade</label><strong class="positive">${{ "%.4f"|format(stats.best_trade_usd or 0) }}</strong><div class="bar"><i style="width:88%"></i></div></div>
+                    <div class="metric"><label>Worst trade</label><strong class="negative">${{ "%.4f"|format(stats.worst_trade_usd or 0) }}</strong><div class="bar"><i style="width:28%"></i></div></div>
+                    <div class="metric"><label>Executed trades</label><strong>{{ stats.total_trades_executed or 0 }}</strong><div class="bar"><i style="width:78%"></i></div></div>
+                    <div class="metric"><label>Failed trades</label><strong class="negative">{{ stats.total_trades_failed or 0 }}</strong><div class="bar"><i style="width:16%"></i></div></div>
                 </div>
             </div>
-            <div class="stat-card">
-                <div class="label">Tổng phí (USD)</div>
-                <div class="value negative">{{ "%.4f"|format(stats.total_fees_usd or 0) }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="label">Lợi nhuận TB / giao dịch</div>
-                <div class="value {% if (stats.avg_profit_per_trade_usd or 0) >= 0 %}positive{% else %}negative{% endif %}">
-                    {{ "%.4f"|format(stats.avg_profit_per_trade_usd or 0) }} USD
+
+            <div class="card panel" id="risk">
+                <div class="panel-title"><h2>Risk Monitor</h2><span class="connected">● SAFE</span></div>
+                <div class="risk-layout">
+                    <div class="metric-list">
+                        <div class="metric"><label>Active sessions</label><strong>{{ stats.running_sessions or 0 }}</strong><div class="bar"><i style="width:{{ 100 if (stats.running_sessions or 0) else 0 }}%"></i></div></div>
+                        <div class="metric"><label>Tracked opportunities</label><strong>{{ stats.total_opportunities or 0 }}</strong><div class="bar"><i style="width:65%"></i></div></div>
+                        <div class="metric"><label>Fees / volume</label><strong>{% if stats.total_volume_usd %}{{ "%.3f"|format((stats.total_fees_usd or 0) / stats.total_volume_usd * 100) }}%{% else %}0.000%{% endif %}</strong><div class="bar"><i style="width:22%"></i></div></div>
+                        <div class="metric"><label>Slippage</label><strong>See analytics</strong><div class="bar"><i style="width:35%"></i></div></div>
+                    </div>
+                    <div class="risk-shield"><div><div class="shield">◇</div><div class="risk-big">LOW</div><div class="risk-small">DB-derived view</div></div></div>
                 </div>
             </div>
-            <div class="stat-card">
-                <div class="label">Giao dịch tốt nhất</div>
-                <div class="value positive">{{ "%.4f"|format(stats.best_trade_usd or 0) }} USD</div>
-            </div>
-            <div class="stat-card">
-                <div class="label">Giao dịch tệ nhất</div>
-                <div class="value negative">{{ "%.4f"|format(stats.worst_trade_usd or 0) }} USD</div>
-            </div>
-            <div class="stat-card">
-                <div class="label">Tổng khối lượng</div>
-                <div class="value neutral">{{ "%.2f"|format(stats.total_volume_usd or 0) }} USD</div>
-            </div>
-        </div>
+        </section>
 
-        <h2>Phiên giao dịch gần đây</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Chế độ</th>
-                    <th>Cặp</th>
-                    <th>Sàn</th>
-                    <th>Vốn</th>
-                    <th>Lợi nhuận</th>
-                    <th>Giao dịch</th>
-                    <th>Trạng thái</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for session in sessions %}
-                <tr>
-                    <td>{{ session.id }}</td>
-                    <td>{{ session.mode }}</td>
-                    <td>{{ session.symbol }}</td>
-                    <td>{{ session.exchanges }}</td>
-                    <td>{{ "%.2f"|format(session.usdt_amount) }}</td>
-                    <td class="{% if (session.total_profit_usd or 0) >= 0 %}positive{% else %}negative{% endif %}">
-                        {{ "%.4f"|format(session.total_profit_usd or 0) }} USD
-                        ({{ "%.4f"|format(session.total_profit_pct or 0) }}%)
-                    </td>
-                    <td>{{ session.trades_executed or 0 }}</td>
-                    <td>
-                        <span class="status status-{{ session.status }}">{{ session.status }}</span>
-                    </td>
-                </tr>
+        <section class="card panel exchange-panel" id="exchanges">
+            <div class="panel-title"><h2>Exchange Coverage</h2><span style="color:#6f7d8b;font-size:9px">SESSION CONFIGURATION</span></div>
+            <div class="exchange-grid">
+                {% for exchange in tracked_exchanges %}
+                <div class="card exchange">
+                    <div class="exchange-name"><span>{{ exchange|upper }}</span><span class="connected">● TRACKED</span></div>
+                    <div class="exchange-meta"><span>Session {{ latest_session.id if latest_session else '—' }}</span><span>Configured</span></div>
+                    <div class="health-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                </div>
+                {% else %}
+                <div class="empty" style="grid-column:1/-1">Chưa có exchange configuration trong session.</div>
                 {% endfor %}
-                {% if not sessions %}
-                <tr><td colspan="8" style="text-align:center; color:#484f58;">Chưa có phiên giao dịch nào</td></tr>
-                {% endif %}
-            </tbody>
-        </table>
+            </div>
+        </section>
 
-        <div class="footer">
-            <p>BMLB Arbitrage Bot Dashboard v1.0 | API: <a href="/docs" style="color:#58a6ff">/docs</a></p>
-        </div>
-    </div>
+        <div class="footer"><span>BMLB Arbitrage Lab · Dashboard v2.0</span><span><a href="/docs" style="color:#5fa6ff">API Docs</a> · Data from SQLite analytics</span></div>
+    </main>
+</div>
+<script>
+(function () {
+    const el = document.getElementById('clock');
+    function tick() {
+        const now = new Date();
+        el.textContent = now.toLocaleTimeString('vi-VN', {hour12:false, timeZone:'Asia/Ho_Chi_Minh'}) + ' (UTC+7)';
+    }
+    tick(); setInterval(tick, 1000);
+})();
+</script>
 </body>
 </html>

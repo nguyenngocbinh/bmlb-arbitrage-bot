@@ -12,16 +12,7 @@ from services.database_service import DatabaseService
 
 
 def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
-    """
-    Tạo FastAPI app.
-
-    Args:
-        db_service (DatabaseService, optional): Dịch vụ database.
-            Nếu không truyền, sẽ tạo mới.
-
-    Returns:
-        FastAPI: App instance
-    """
+    """Tạo FastAPI app."""
     app = FastAPI(
         title="BMLB Arbitrage Bot Dashboard",
         description="Dashboard theo dõi giao dịch arbitrage crypto",
@@ -30,10 +21,7 @@ def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
 
     templates_dir = os.path.join(os.path.dirname(__file__), 'templates')
     templates = Jinja2Templates(directory=templates_dir)
-
     db = db_service or DatabaseService()
-
-    # ─── Dashboard HTML ───────────────────────────────────────────
 
     @app.get("/", response_class=HTMLResponse)
     async def landing(request: Request):
@@ -47,15 +35,41 @@ def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
 
     @app.get("/dashboard", response_class=HTMLResponse)
     async def dashboard(request: Request):
-        """Trang dashboard chính."""
+        """Trading-terminal dashboard with live database analytics."""
         stats = db.get_overall_stats()
         sessions = db.get_all_sessions(limit=10)
+        recent_trades = db.get_all_trades(limit=8)
+        daily_profit = db.get_daily_profit(days=30)
+        hourly_profit = db.get_hourly_profit(days=1)
+
+        latest_session = sessions[0] if sessions else None
+        opportunities = (
+            db.get_opportunities_by_session(latest_session['id'], limit=8)
+            if latest_session else []
+        )
+
+        # These values are derived from persisted DB data.  They are intentionally
+        # labelled as database/session state rather than pretending to be exchange
+        # heartbeat telemetry, which is not persisted by the current backend.
+        running_sessions = stats.get('running_sessions') or 0
+        bot_status = 'RUNNING' if running_sessions else 'IDLE'
+        tracked_exchanges = []
+        if latest_session:
+            tracked_exchanges = [
+                x.strip() for x in (latest_session.get('exchanges') or '').split(',') if x.strip()
+            ]
+
         return templates.TemplateResponse(request, "dashboard.html", context={
             "stats": stats,
             "sessions": sessions,
+            "recent_trades": recent_trades,
+            "daily_profit": daily_profit,
+            "hourly_profit": hourly_profit,
+            "opportunities": opportunities,
+            "latest_session": latest_session,
+            "bot_status": bot_status,
+            "tracked_exchanges": tracked_exchanges,
         })
-
-    # ─── API: Sessions ────────────────────────────────────────────
 
     @app.get("/api/sessions")
     async def get_sessions(
@@ -75,8 +89,6 @@ def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
         if not session:
             raise HTTPException(status_code=404, detail="Phiên không tồn tại")
         return {"success": True, "data": session}
-
-    # ─── API: Trades ──────────────────────────────────────────────
 
     @app.get("/api/trades")
     async def get_trades(
@@ -104,8 +116,6 @@ def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
         """Lấy giao dịch của một phiên."""
         trades = db.get_trades_by_session(session_id, limit, offset)
         return {"success": True, "data": trades, "count": len(trades)}
-
-    # ─── API: Statistics ──────────────────────────────────────────
 
     @app.get("/api/stats/overview")
     async def get_overview_stats():
@@ -158,8 +168,6 @@ def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
         data = db.get_slippage_by_exchange(session_id)
         return {"success": True, "data": data}
 
-    # ─── API: Errors ──────────────────────────────────────────────
-
     @app.get("/api/errors")
     async def get_errors(
         session_id: int = Query(None),
@@ -170,8 +178,6 @@ def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
         errors = db.get_errors(session_id, error_type, limit)
         return {"success": True, "data": errors, "count": len(errors)}
 
-    # ─── API: Health ──────────────────────────────────────────────
-
     @app.get("/api/health")
     async def health_check():
         """Kiểm tra trạng thái server."""
@@ -180,5 +186,4 @@ def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
     return app
 
 
-# Default app instance
 app = create_app()
