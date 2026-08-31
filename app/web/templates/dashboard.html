@@ -1,271 +1,43 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BMLB — Arbitrage Dashboard</title>
-    <style>
-        :root {
-            --bg: #090a0d;
-            --surface: #101116;
-            --surface-2: #15161c;
-            --surface-3: #1b1c23;
-            --border: rgba(255,255,255,.085);
-            --border-strong: rgba(255,255,255,.14);
-            --text: #f4f4f5;
-            --text-2: #b4b5bd;
-            --muted: #737580;
-            --purple: #8b5cf6;
-            --purple-2: #a78bfa;
-            --purple-soft: rgba(139,92,246,.15);
-            --green: #34d399;
-            --green-soft: rgba(52,211,153,.12);
-            --red: #fb7185;
-            --red-soft: rgba(251,113,133,.11);
-            --amber: #fbbf24;
-            --cyan: #22d3ee;
-            --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-        }
-        * { box-sizing: border-box; }
-        html { background: var(--bg); }
-        body {
-            margin: 0; min-height: 100vh; color: var(--text);
-            font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background-color: var(--bg);
-            background-image: linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
-            background-size: 32px 32px;
-        }
-        body:before { content:""; position:fixed; inset:0; pointer-events:none; background: radial-gradient(circle at 48% -12%, rgba(139,92,246,.16), transparent 34%), radial-gradient(circle at 100% 55%, rgba(34,211,238,.035), transparent 30%); }
-        a { color: inherit; text-decoration: none; }
-        button, select, input { font: inherit; }
-        .shell { position: relative; display:flex; min-height:100vh; }
-        .sidebar { width:232px; flex:0 0 232px; min-height:100vh; position:sticky; top:0; padding:18px 14px; border-right:1px solid var(--border); background:rgba(9,10,13,.91); backdrop-filter:blur(18px); display:flex; flex-direction:column; }
-        .brand { display:flex; gap:11px; align-items:center; padding:6px 8px 22px; }
-        .brand-mark { width:35px; height:35px; border-radius:10px; display:grid; place-items:center; font-weight:800; color:white; background:linear-gradient(135deg,#7c3aed,#c084fc); box-shadow:0 0 24px rgba(139,92,246,.28); }
-        .brand-name { font-size:15px; font-weight:750; letter-spacing:-.02em; }
-        .brand-sub { color:var(--muted); font-size:9px; letter-spacing:.17em; margin-top:2px; }
-        .nav-label { color:#666873; font-size:9px; font-weight:650; letter-spacing:.12em; text-transform:uppercase; padding:0 11px 7px; }
-        .nav { display:grid; gap:2px; }
-        .nav + .nav-label { margin-top:17px; }
-        .nav a { position:relative; display:flex; align-items:center; gap:10px; min-height:34px; padding:8px 10px; border-radius:7px; color:#a9abb5; font-size:12px; transition:.16s ease; }
-        .nav a:hover { color:#e7e7eb; background:rgba(255,255,255,.035); }
-        .nav a.active { color:#fff; background:linear-gradient(90deg,rgba(139,92,246,.24),rgba(139,92,246,.08)); box-shadow:inset 1px 0 0 rgba(167,139,250,.9), inset 0 0 20px rgba(139,92,246,.06); }
-        .nav a.active:after { content:""; position:absolute; right:8px; width:4px; height:4px; border-radius:50%; background:var(--purple-2); box-shadow:0 0 9px var(--purple); }
-        .icon { width:18px; height:18px; display:grid; place-items:center; color:#777985; font-size:13px; }
-        .active .icon { color:var(--purple-2); }
-        .promo { margin-top:auto; padding:13px; border:1px solid rgba(139,92,246,.28); border-radius:9px; background:linear-gradient(145deg,rgba(91,33,182,.22),rgba(17,17,23,.72)); }
-        .promo b { display:block; font-size:11px; margin-bottom:4px; }
-        .promo p { margin:0 0 10px; color:#858692; font-size:9px; line-height:1.5; }
-        .promo a { display:flex; justify-content:space-between; align-items:center; color:#d9ccff; font-size:10px; font-weight:700; }
-        .side-foot { display:flex; justify-content:space-between; margin-top:12px; color:#4f515b; font:9px var(--mono); padding:0 3px; }
-        main { width:min(1540px,100%); margin:0 auto; padding:16px 22px 28px; }
-        .topbar { height:50px; display:flex; align-items:center; gap:16px; border-bottom:1px solid var(--border); margin-bottom:21px; }
-        .crumb { display:flex; gap:8px; align-items:center; color:#8b8d97; font-size:11px; white-space:nowrap; }
-        .crumb b { color:#eeeef0; font-weight:600; }
-        .crumb i { color:#454751; font-style:normal; }
-        .search { flex:1; max-width:410px; margin-left:auto; height:34px; display:flex; align-items:center; gap:9px; padding:0 11px; border:1px solid var(--border); border-radius:7px; background:rgba(16,17,22,.72); color:#686a75; font-size:10px; }
-        .search kbd { margin-left:auto; color:#686a75; border:1px solid var(--border); border-radius:4px; padding:2px 5px; font:9px var(--mono); }
-        .top-status { display:flex; align-items:center; gap:8px; color:var(--green); font-size:10px; font-weight:700; padding:7px 10px; border:1px solid rgba(52,211,153,.18); border-radius:999px; background:var(--green-soft); }
-        .pulse { width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 10px rgba(52,211,153,.9); }
-        .top-icon { width:30px; height:30px; border:1px solid transparent; border-radius:7px; display:grid; place-items:center; color:#777985; font-size:14px; }
-        .top-icon:hover { border-color:var(--border); background:rgba(255,255,255,.035); }
-        .avatar { width:28px; height:28px; border-radius:50%; display:grid; place-items:center; color:#ddd2ff; background:linear-gradient(135deg,#4c1d95,#8b5cf6); font-size:9px; font-weight:750; }
-        .hero { display:flex; justify-content:space-between; align-items:end; gap:20px; margin-bottom:18px; }
-        .eyebrow { color:var(--purple-2); font:9px var(--mono); letter-spacing:.11em; text-transform:uppercase; margin-bottom:7px; }
-        h1 { margin:0; font-size:25px; letter-spacing:-.035em; line-height:1.1; }
-        .hero p { margin:6px 0 0; color:var(--muted); font-size:11px; }
-        .range { display:flex; border:1px solid var(--border); border-radius:7px; overflow:hidden; }
-        .range button { border:0; border-right:1px solid var(--border); background:rgba(16,17,22,.8); color:#7d7f89; padding:7px 11px; font-size:9px; }
-        .range button:last-child { border-right:0; }
-        .range button.active { color:#fff; background:linear-gradient(135deg,#6d28d9,#8b5cf6); box-shadow:inset 0 0 16px rgba(255,255,255,.08); }
-        .kpis { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; margin-bottom:10px; }
-        .card { border:1px solid var(--border); border-radius:8px; background:linear-gradient(145deg,rgba(18,19,25,.94),rgba(13,14,18,.96)); box-shadow:0 14px 35px rgba(0,0,0,.12); }
-        .kpi { padding:13px; min-height:104px; position:relative; overflow:hidden; }
-        .kpi:after { content:""; position:absolute; width:90px; height:90px; right:-38px; top:-38px; border-radius:50%; background:rgba(139,92,246,.08); filter:blur(2px); }
-        .kpi-label { color:#7f818b; font-size:9px; text-transform:uppercase; letter-spacing:.08em; }
-        .kpi-value { margin-top:8px; font-size:20px; font-weight:700; letter-spacing:-.035em; }
-        .kpi-sub { margin-top:4px; color:#686a74; font-size:9px; }
-        .positive { color:var(--green); } .negative { color:var(--red); } .purple { color:var(--purple-2); }
-        .spark { position:absolute; right:10px; bottom:11px; width:72px; height:25px; opacity:.72; }
-        .spark polyline { fill:none; stroke:currentColor; stroke-width:1.7; }
-        .layout { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(330px,.78fr); gap:10px; }
-        .panel { padding:14px; min-width:0; }
-        .panel-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:13px; }
-        .panel-title { font-size:11px; font-weight:650; }
-        .panel-meta { color:#656771; font:9px var(--mono); }
-        .link { color:var(--purple-2); font-size:9px; }
-        .chart-tools { display:flex; align-items:center; gap:4px; }
-        .chart-tab { border:0; background:transparent; color:#6f717c; padding:5px 7px; border-radius:5px; font-size:9px; }
-        .chart-tab.active { color:#ddd2ff; background:var(--purple-soft); }
-        .chart { height:275px; border-top:1px solid rgba(255,255,255,.04); border-bottom:1px solid rgba(255,255,255,.04); position:relative; background:repeating-linear-gradient(to bottom,transparent 0,transparent 54px,rgba(255,255,255,.035) 55px); }
-        .chart:before { content:""; position:absolute; inset:0; background:linear-gradient(90deg,transparent 24.9%,rgba(255,255,255,.025) 25%,transparent 25.1%,transparent 49.9%,rgba(255,255,255,.025) 50%,transparent 50.1%,transparent 74.9%,rgba(255,255,255,.025) 75%,transparent 75.1%); }
-        .chart svg { width:100%; height:100%; }
-        .chart-area { fill:url(#area); }
-        .chart-line { fill:none; stroke:#9b6cff; stroke-width:2.1; vector-effect:non-scaling-stroke; filter:drop-shadow(0 0 4px rgba(139,92,246,.38)); }
-        .chart-labels { display:flex; justify-content:space-between; padding-top:6px; color:#4f515b; font:8px var(--mono); }
-        .mini-grid { display:grid; grid-template-columns:repeat(5,1fr); margin-top:12px; border-top:1px solid var(--border); }
-        .mini-metric { padding:10px 8px 0; border-right:1px solid var(--border); }
-        .mini-metric:last-child { border-right:0; }
-        .mini-metric label { display:block; color:#686a74; font-size:8px; text-transform:uppercase; letter-spacing:.06em; }
-        .mini-metric b { display:block; margin-top:4px; font:600 12px var(--mono); }
-        .system-list { display:grid; gap:0; }
-        .system-row { display:grid; grid-template-columns:22px 1fr auto; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid rgba(255,255,255,.045); font-size:10px; }
-        .system-row:last-child { border-bottom:0; }
-        .system-icon { color:#a78bfa; font-size:12px; }
-        .system-name { color:#bdbec6; }
-        .system-state { color:#747680; }
-        .system-state.ok { color:var(--green); }
-        .latency { color:#777984; font:8px var(--mono); margin-left:7px; }
-        .section-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
-        .table-wrap { overflow:auto; }
-        table { width:100%; border-collapse:collapse; }
-        th { padding:0 8px 8px; text-align:left; color:#5f616b; font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; }
-        td { padding:9px 8px; border-top:1px solid rgba(255,255,255,.05); color:#bfc0c8; font-size:9px; white-space:nowrap; }
-        tr:hover td { background:rgba(255,255,255,.02); }
-        .pair { color:#eeeef0; font-weight:650; }
-        .mono { font-family:var(--mono); }
-        .badge { display:inline-flex; align-items:center; gap:5px; padding:3px 6px; border-radius:4px; font:700 7px var(--mono); letter-spacing:.04em; }
-        .badge.ok { color:var(--green); background:var(--green-soft); }
-        .badge.warn { color:var(--amber); background:rgba(251,191,36,.1); }
-        .badge.bad { color:var(--red); background:var(--red-soft); }
-        .empty { color:#555762; text-align:center; padding:25px 8px !important; }
-        .risk { display:grid; grid-template-columns:1fr 100px; gap:12px; align-items:center; }
-        .risk-score { height:100px; border-left:1px solid var(--border); display:grid; place-items:center; text-align:center; }
-        .risk-ring { width:68px; height:68px; border-radius:50%; display:grid; place-items:center; background:radial-gradient(circle at center,var(--surface) 54%,transparent 55%), conic-gradient(var(--green) 0 28%,#25272f 28% 100%); }
-        .risk-ring b { color:var(--green); font:700 13px var(--mono); }
-        .risk-score small { color:#646671; font-size:8px; margin-top:4px; }
-        .risk-list { display:grid; gap:9px; }
-        .risk-item { display:grid; grid-template-columns:1fr auto; gap:6px; font-size:9px; }
-        .risk-item label { color:#777984; }
-        .bar { grid-column:1/-1; height:3px; background:#22242b; border-radius:99px; overflow:hidden; }
-        .bar i { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,#6d28d9,#a78bfa); }
-        .exchanges { margin-top:10px; }
-        .exchange-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
-        .exchange { padding:11px; }
-        .exchange-name { display:flex; justify-content:space-between; align-items:center; font-size:10px; font-weight:650; }
-        .exchange-dot { width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 7px rgba(52,211,153,.5); }
-        .exchange-meta { display:flex; justify-content:space-between; color:#62646e; font:8px var(--mono); margin-top:8px; }
-        .health { display:flex; gap:2px; margin-top:8px; }
-        .health i { flex:1; height:3px; background:var(--green); border-radius:2px; }
-        .footer { display:flex; justify-content:space-between; margin-top:14px; color:#4b4d56; font:8px var(--mono); }
-        @media(max-width:1200px){ .sidebar{width:200px;flex-basis:200px}.kpis{grid-template-columns:repeat(3,1fr)}.layout{grid-template-columns:1fr}.exchange-grid{grid-template-columns:repeat(3,1fr)} }
-        @media(max-width:760px){ .shell{display:block}.sidebar{position:static;width:auto;min-height:auto}.nav{grid-template-columns:repeat(2,1fr)}.promo{display:none}.topbar{height:auto;padding:12px 0;flex-wrap:wrap}.search{order:3;max-width:none;flex-basis:100%;margin-left:0}.hero{display:block}.range{margin-top:12px;width:max-content}.kpis,.section-row,.exchange-grid{grid-template-columns:1fr}.mini-grid{grid-template-columns:repeat(2,1fr)}.mini-metric:nth-child(2n){border-right:0}.risk{grid-template-columns:1fr}.risk-score{border-left:0;border-top:1px solid var(--border);padding-top:12px}.footer{display:block;line-height:1.8}main{padding:10px 12px 20px} }
-    </style>
-</head>
-<body>
-<div class="shell">
-    <aside class="sidebar">
-        <div class="brand"><div class="brand-mark">B</div><div><div class="brand-name">BMLB</div><div class="brand-sub">ARBITRAGE LAB</div></div></div>
-        <div class="nav-label">Overview</div>
-        <nav class="nav">
-            <a class="active" href="/dashboard"><span class="icon">⌂</span>Dashboard</a>
-            <a href="#opportunities"><span class="icon">⌁</span>Live Monitor</a>
-        </nav>
-        <div class="nav-label">Trading</div>
-        <nav class="nav">
-            <a href="#opportunities"><span class="icon">⇄</span>Arbitrage</a>
-            <a href="#opportunities"><span class="icon">✦</span>Opportunities</a>
-            <a href="#trades"><span class="icon">▤</span>Orders</a>
-        </nav>
-        <div class="nav-label">Research</div>
-        <nav class="nav">
-            <a href="/backtest"><span class="icon">◷</span>Backtest</a>
-            <a href="#trades"><span class="icon">◫</span>Sessions</a>
-            <a href="#performance"><span class="icon">⌁</span>Performance</a>
-        </nav>
-        <div class="nav-label">Infrastructure</div>
-        <nav class="nav">
-            <a href="#exchanges"><span class="icon">◎</span>Exchanges</a>
-            <a href="#risk"><span class="icon">△</span>Risk</a>
-            <a href="#system"><span class="icon">≡</span>Logs</a>
-        </nav>
-        <div class="nav-label">Settings</div>
-        <nav class="nav"><a href="/settings"><span class="icon">⚙</span>Bot Profile</a><a href="/settings"><span class="icon">◌</span>System Settings</a></nav>
-        <div class="promo"><b>BMLB Pro</b><p>Advanced analytics, execution diagnostics and risk monitoring.</p><a href="/backtest">Open research →</a></div>
-        <div class="side-foot"><span>v2.0</span><span>UTC+7</span></div>
-    </aside>
-
-    <main>
-        <header class="topbar">
-            <div class="crumb"><b>Overview</b><i>/</i><span>Dashboard</span></div>
-            <div class="search"><span>⌕</span><span>Search markets, exchanges, pairs...</span><kbd>⌘ K</kbd></div>
-            <div class="top-status"><span class="pulse"></span>{{ bot_status }}</div>
-            <div class="top-icon">☼</div><div class="top-icon">♧</div><div class="top-icon">▥</div><div class="avatar">NB</div>
-        </header>
-
-        <section class="hero">
-            <div><div class="eyebrow">BMLB / ARBITRAGE TERMINAL</div><h1>Dashboard</h1><p>Real-time overview of arbitrage performance, execution and system health.</p></div>
-            <div class="range"><button>1H</button><button>6H</button><button class="active">24H</button><button>7D</button><button>30D</button></div>
-        </section>
-
-        <section class="kpis">
-            <div class="card kpi"><div class="kpi-label">Total P&L · 24H</div><div class="kpi-value positive">+${{ "%.2f"|format(stats.total_profit_usd or 0) }}</div><div class="kpi-sub">{{ "%.2f"|format(stats.avg_profit_per_trade_usd or 0) }} avg / trade</div><svg class="spark positive" viewBox="0 0 80 28" preserveAspectRatio="none"><polyline points="0,24 10,21 20,23 30,15 40,18 50,10 60,13 70,7 80,3"/></svg></div>
-            <div class="card kpi"><div class="kpi-label">Total Trades</div><div class="kpi-value">{{ stats.total_trades_executed or 0 }}</div><div class="kpi-sub">{{ stats.total_trades_failed or 0 }} failed</div><svg class="spark purple" viewBox="0 0 80 28" preserveAspectRatio="none"><polyline points="0,24 10,22 20,23 30,15 40,19 50,12 60,15 70,7 80,4"/></svg></div>
-            <div class="card kpi"><div class="kpi-label">Open Opportunities</div><div class="kpi-value purple">{{ stats.total_opportunities or 0 }}</div><div class="kpi-sub">Across tracked sessions</div><svg class="spark purple" viewBox="0 0 80 28" preserveAspectRatio="none"><polyline points="0,20 12,16 24,19 36,10 48,14 60,5 68,12 80,2"/></svg></div>
-            <div class="card kpi"><div class="kpi-label">Fees</div><div class="kpi-value">${{ "%.2f"|format(stats.total_fees_usd or 0) }}</div><div class="kpi-sub">Execution cost</div></div>
-            <div class="card kpi"><div class="kpi-label">Risk Level</div><div class="kpi-value positive">LOW</div><div class="kpi-sub">DB-derived monitor</div></div>
-        </section>
-
-        <section class="layout">
-            <div class="card panel">
-                <div class="panel-head"><div><div class="panel-title">P&L Performance</div><div class="panel-meta">CUMULATIVE · USD</div></div><div class="chart-tools"><button class="chart-tab active">P&L</button><button class="chart-tab">P&L %</button><button class="chart-tab">Equity</button></div></div>
-                <div class="chart"><svg viewBox="0 0 900 275" preserveAspectRatio="none"><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".32"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient></defs><path class="chart-area" d="M0 232 L45 217 L92 226 L140 191 L187 204 L235 171 L282 180 L330 145 L378 158 L425 120 L473 139 L520 103 L568 126 L615 84 L663 105 L710 70 L758 88 L805 58 L855 75 L900 42 L900 275 L0 275 Z"/><path class="chart-line" d="M0 232 L45 217 L92 226 L140 191 L187 204 L235 171 L282 180 L330 145 L378 158 L425 120 L473 139 L520 103 L568 126 L615 84 L663 105 L710 70 L758 88 L805 58 L855 75 L900 42"/></svg></div>
-                <div class="chart-labels"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
-                <div class="mini-grid"><div class="mini-metric"><label>Max drawdown</label><b class="negative">—</b></div><div class="mini-metric"><label>Sharpe</label><b>—</b></div><div class="mini-metric"><label>Win rate</label><b>—</b></div><div class="mini-metric"><label>Profit factor</label><b>—</b></div><div class="mini-metric"><label>Avg hold</label><b>—</b></div></div>
-            </div>
-
-            <div class="card panel" id="system">
-                <div class="panel-head"><div class="panel-title">System Status</div><a class="link" href="#exchanges">View all</a></div>
-                <div class="system-list">
-                    <div class="system-row"><span class="system-icon">◌</span><span class="system-name">Market Data</span><span class="system-state ok">Connected <span class="latency">—</span> ●</span></div>
-                    <div class="system-row"><span class="system-icon">▣</span><span class="system-name">Order Execution</span><span class="system-state ok">Ready ●</span></div>
-                    <div class="system-row"><span class="system-icon">✦</span><span class="system-name">Rate Limiter</span><span class="system-state ok">Active ●</span></div>
-                    <div class="system-row"><span class="system-icon">▤</span><span class="system-name">Database</span><span class="system-state ok">Healthy ●</span></div>
-                    <div class="system-row"><span class="system-icon">➤</span><span class="system-name">Telegram Bot</span><span class="system-state ok">Connected ●</span></div>
-                    <div class="system-row"><span class="system-icon">⌁</span><span class="system-name">WebSocket</span><span class="system-state ok">Connected ●</span></div>
-                </div>
-            </div>
-        </section>
-
-        <section class="section-row">
-            <div class="card panel" id="opportunities">
-                <div class="panel-head"><div class="panel-title">Top Opportunities</div><a class="link" href="/api/sessions">View all</a></div>
-                <div class="table-wrap"><table><thead><tr><th>Symbol</th><th>Route</th><th>Spread</th><th>Est. P&L</th><th>Status</th></tr></thead><tbody>
-                {% for o in opportunities %}<tr><td class="pair">{{ o.symbol }}</td><td>{{ o.buy_exchange|upper }} → {{ o.sell_exchange|upper }}</td><td class="positive">+{{ "%.3f"|format(o.spread_pct) }}%</td><td>${{ "%.3f"|format(o.estimated_profit_usd) }}</td><td><span class="badge {% if o.executed %}ok{% else %}warn{% endif %}">● {% if o.executed %}EXECUTED{% else %}OBSERVED{% endif %}</span></td></tr>{% else %}<tr><td colspan="5" class="empty">No persisted opportunities yet.</td></tr>{% endfor %}
-                </tbody></table></div>
-            </div>
-            <div class="card panel" id="performance">
-                <div class="panel-head"><div class="panel-title">Performance</div><span class="panel-meta">ALL TIME</span></div>
-                <div class="risk-list">
-                    <div class="risk-item"><label>Avg profit / trade</label><b class="positive">${{ "%.4f"|format(stats.avg_profit_per_trade_usd or 0) }}</b><div class="bar"><i style="width:72%"></i></div></div>
-                    <div class="risk-item"><label>Best trade</label><b class="positive">${{ "%.4f"|format(stats.best_trade_usd or 0) }}</b><div class="bar"><i style="width:88%"></i></div></div>
-                    <div class="risk-item"><label>Worst trade</label><b class="negative">${{ "%.4f"|format(stats.worst_trade_usd or 0) }}</b><div class="bar"><i style="width:28%"></i></div></div>
-                    <div class="risk-item"><label>Executed</label><b>{{ stats.total_trades_executed or 0 }}</b><div class="bar"><i style="width:78%"></i></div></div>
-                </div>
-            </div>
-        </section>
-
-        <section class="section-row">
-            <div class="card panel" id="trades">
-                <div class="panel-head"><div class="panel-title">Recent Trades</div><a class="link" href="/api/trades">View all</a></div>
-                <div class="table-wrap"><table><thead><tr><th>Time</th><th>Symbol</th><th>Route</th><th>P&L</th><th>Status</th></tr></thead><tbody>
-                {% for t in recent_trades %}<tr><td class="mono">{{ t.timestamp[11:19] }}</td><td class="pair">{{ t.symbol }}</td><td>{{ t.buy_exchange|upper }} → {{ t.sell_exchange|upper }}</td><td class="{% if t.profit_usd >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if t.profit_usd >= 0 else "" }}${{ "%.3f"|format(t.profit_usd) }}</td><td><span class="badge {% if t.status == 'executed' %}ok{% else %}bad{% endif %}">● {{ t.status|upper }}</span></td></tr>{% else %}<tr><td colspan="5" class="empty">No trades yet.</td></tr>{% endfor %}
-                </tbody></table></div>
-            </div>
-            <div class="card panel" id="risk">
-                <div class="panel-head"><div class="panel-title">Risk Monitor</div><span class="badge ok">● SAFE</span></div>
-                <div class="risk"><div class="risk-list"><div class="risk-item"><label>Active sessions</label><b>{{ stats.running_sessions or 0 }}</b><div class="bar"><i style="width:{{ 100 if (stats.running_sessions or 0) else 0 }}%"></i></div></div><div class="risk-item"><label>Tracked opportunities</label><b>{{ stats.total_opportunities or 0 }}</b><div class="bar"><i style="width:65%"></i></div></div><div class="risk-item"><label>Fee / volume</label><b>{% if stats.total_volume_usd %}{{ "%.3f"|format((stats.total_fees_usd or 0) / stats.total_volume_usd * 100) }}%{% else %}0.000%{% endif %}</b><div class="bar"><i style="width:22%"></i></div></div></div><div class="risk-score"><div><div class="risk-ring"><b>LOW</b></div><small>2.1 / 10</small></div></div></div>
-            </div>
-        </section>
-
-        <section class="card panel exchanges" id="exchanges">
-            <div class="panel-head"><div class="panel-title">Exchange Coverage</div><span class="panel-meta">SESSION CONFIGURATION</span></div>
-            <div class="exchange-grid">{% for exchange in tracked_exchanges %}<div class="card exchange"><div class="exchange-name"><span>{{ exchange|upper }}</span><span class="exchange-dot"></span></div><div class="exchange-meta"><span>Session #{{ latest_session.id if latest_session else '—' }}</span><span>Healthy</span></div><div class="health"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>{% else %}<div class="empty" style="grid-column:1/-1">No exchange configuration in the latest session.</div>{% endfor %}</div>
-        </section>
-
-        <footer class="footer"><span>BMLB Arbitrage Lab · dashboard v2.0</span><span>SQLite analytics · <a class="link" href="/settings">Settings</a> · <span id="clock">--:--:--</span> UTC+7</span></footer>
-    </main>
+{% extends 'layouts/base.html' %}
+{% block title %}BMLB — Dashboard{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><div class="eyebrow">BMLB / ARBITRAGE TERMINAL</div><h1>Dashboard</h1><p>Real-time overview of arbitrage performance, execution and system health.</p></div>
+    <div class="range"><button>1H</button><button>6H</button><button class="active">24H</button><button>7D</button><button>30D</button></div>
 </div>
-<script>(function(){const e=document.getElementById('clock');function t(){e.textContent=new Date().toLocaleTimeString('vi-VN',{hour12:false,timeZone:'Asia/Ho_Chi_Minh'});}t();setInterval(t,1000);})();</script>
-</body>
-</html>
+
+<section class="kpis">
+    <div class="card kpi"><span class="kpi-label">Total P&amp;L · 24H</span><strong class="kpi-value positive">+${{ "%.2f"|format(stats.total_profit_usd or 0) }}</strong><span class="kpi-sub">{{ "%.4f"|format(stats.avg_profit_per_trade_usd or 0) }} avg / trade</span></div>
+    <div class="card kpi"><span class="kpi-label">Total Trades</span><strong class="kpi-value">{{ stats.total_trades_executed or 0 }}</strong><span class="kpi-sub">{{ stats.total_trades_failed or 0 }} failed</span></div>
+    <div class="card kpi"><span class="kpi-label">Opportunities</span><strong class="kpi-value purple">{{ stats.total_opportunities or 0 }}</strong><span class="kpi-sub">Tracked across sessions</span></div>
+    <div class="card kpi"><span class="kpi-label">Fees</span><strong class="kpi-value">${{ "%.2f"|format(stats.total_fees_usd or 0) }}</strong><span class="kpi-sub">Execution cost</span></div>
+    <div class="card kpi"><span class="kpi-label">Risk Level</span><strong class="kpi-value positive">LOW</strong><span class="kpi-sub">DB-derived monitor</span></div>
+</section>
+
+<section class="dashboard-grid">
+    <article class="card panel chart-panel">
+        <div class="panel-head"><div><div class="panel-title">P&amp;L Performance</div><div class="panel-meta">CUMULATIVE · USD</div></div><div class="chart-tabs"><button class="chart-tab active">P&amp;L</button><button class="chart-tab">P&amp;L %</button><button class="chart-tab">Equity</button></div></div>
+        <div class="chart"><svg viewBox="0 0 900 275" preserveAspectRatio="none"><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".32"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient></defs><path class="chart-area" d="M0 232 L45 217 L92 226 L140 191 L187 204 L235 171 L282 180 L330 145 L378 158 L425 120 L473 139 L520 103 L568 126 L615 84 L663 105 L710 70 L758 88 L805 58 L855 75 L900 42 L900 275 L0 275 Z"/><path class="chart-line" d="M0 232 L45 217 L92 226 L140 191 L187 204 L235 171 L282 180 L330 145 L378 158 L425 120 L473 139 L520 103 L568 126 L615 84 L663 105 L710 70 L758 88 L805 58 L855 75 L900 42"/></svg></div>
+        <div class="chart-labels"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+        <div class="mini-grid"><div><label>Max drawdown</label><b class="negative">—</b></div><div><label>Sharpe</label><b>—</b></div><div><label>Win rate</label><b>—</b></div><div><label>Profit factor</label><b>—</b></div><div><label>Avg hold</label><b>—</b></div></div>
+    </article>
+
+    <article class="card panel" id="system"><div class="panel-head"><div class="panel-title">System Status</div><a class="link" href="#exchanges">View all</a></div><div class="system-list">
+        <div class="system-row"><span class="system-icon">◌</span><span class="system-name">Market Data</span><span class="system-state ok">Connected ●</span></div>
+        <div class="system-row"><span class="system-icon">▣</span><span class="system-name">Order Execution</span><span class="system-state ok">Ready ●</span></div>
+        <div class="system-row"><span class="system-icon">✦</span><span class="system-name">Rate Limiter</span><span class="system-state ok">Active ●</span></div>
+        <div class="system-row"><span class="system-icon">▤</span><span class="system-name">Database</span><span class="system-state ok">Healthy ●</span></div>
+        <div class="system-row"><span class="system-icon">➤</span><span class="system-name">Telegram Bot</span><span class="system-state ok">Connected ●</span></div>
+        <div class="system-row"><span class="system-icon">⌁</span><span class="system-name">WebSocket</span><span class="system-state ok">Connected ●</span></div>
+    </div></article>
+</section>
+
+<section class="two-col">
+    <article class="card panel" id="opportunities"><div class="panel-head"><div class="panel-title">Top Opportunities</div><a class="link" href="/api/sessions">View all</a></div><div class="table-wrap"><table><thead><tr><th>Symbol</th><th>Route</th><th>Spread</th><th>Est. P&amp;L</th><th>Status</th></tr></thead><tbody>{% for o in opportunities %}<tr><td class="pair">{{ o.symbol }}</td><td>{{ o.buy_exchange|upper }} → {{ o.sell_exchange|upper }}</td><td class="positive">+{{ "%.3f"|format(o.spread_pct) }}%</td><td>${{ "%.3f"|format(o.estimated_profit_usd) }}</td><td><span class="badge {% if o.executed %}ok{% else %}warn{% endif %}">● {% if o.executed %}EXECUTED{% else %}OBSERVED{% endif %}</span></td></tr>{% else %}<tr><td colspan="5" class="empty">No persisted opportunities yet.</td></tr>{% endfor %}</tbody></table></div></article>
+    <article class="card panel" id="risk"><div class="panel-head"><div class="panel-title">Risk Monitor</div><span class="badge ok">● SAFE</span></div><div class="risk"><div class="risk-list"><div class="risk-item"><label>Active sessions</label><b>{{ stats.running_sessions or 0 }}</b><div class="bar"><i style="width:{{ 100 if (stats.running_sessions or 0) else 0 }}%"></i></div></div><div class="risk-item"><label>Tracked opportunities</label><b>{{ stats.total_opportunities or 0 }}</b><div class="bar"><i style="width:65%"></i></div></div><div class="risk-item"><label>Fee / volume</label><b>{% if stats.total_volume_usd %}{{ "%.3f"|format((stats.total_fees_usd or 0) / stats.total_volume_usd * 100) }}%{% else %}0.000%{% endif %}</b><div class="bar"><i style="width:22%"></i></div></div></div><div class="risk-score"><div class="risk-ring"><b>LOW</b></div><small>2.1 / 10</small></div></div></article>
+</section>
+
+<section class="two-col" id="trades"><article class="card panel"><div class="panel-head"><div class="panel-title">Recent Trades</div><a class="link" href="/api/trades">View all</a></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Symbol</th><th>Route</th><th>P&amp;L</th><th>Status</th></tr></thead><tbody>{% for t in recent_trades %}<tr><td class="mono">{{ t.timestamp[11:19] }}</td><td class="pair">{{ t.symbol }}</td><td>{{ t.buy_exchange|upper }} → {{ t.sell_exchange|upper }}</td><td class="{% if t.profit_usd >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if t.profit_usd >= 0 else "" }}${{ "%.3f"|format(t.profit_usd) }}</td><td><span class="badge {% if t.status == 'executed' %}ok{% else %}bad{% endif %}">● {{ t.status|upper }}</span></td></tr>{% else %}<tr><td colspan="5" class="empty">No trades yet.</td></tr>{% endfor %}</tbody></table></div></article><article class="card panel" id="performance"><div class="panel-head"><div class="panel-title">Performance</div><span class="panel-meta">ALL TIME</span></div><div class="risk-list"><div class="risk-item"><label>Avg profit / trade</label><b class="positive">${{ "%.4f"|format(stats.avg_profit_per_trade_usd or 0) }}</b><div class="bar"><i style="width:72%"></i></div></div><div class="risk-item"><label>Best trade</label><b class="positive">${{ "%.4f"|format(stats.best_trade_usd or 0) }}</b><div class="bar"><i style="width:88%"></i></div></div><div class="risk-item"><label>Worst trade</label><b class="negative">${{ "%.4f"|format(stats.worst_trade_usd or 0) }}</b><div class="bar"><i style="width:28%"></i></div></div><div class="risk-item"><label>Executed</label><b>{{ stats.total_trades_executed or 0 }}</b><div class="bar"><i style="width:78%"></i></div></div></div></article></section>
+
+<section class="card panel" id="exchanges"><div class="panel-head"><div class="panel-title">Exchange Coverage</div><span class="panel-meta">SESSION CONFIGURATION</span></div><div class="exchange-grid">{% for exchange in tracked_exchanges %}<div class="card exchange"><div class="exchange-name"><span>{{ exchange|upper }}</span><span class="exchange-dot"></span></div><div class="exchange-meta"><span>Session #{{ latest_session.id if latest_session else '—' }}</span><span>Healthy</span></div><div class="health"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>{% else %}<div class="empty" style="grid-column:1/-1">No exchange configuration in the latest session.</div>{% endfor %}</div></section>
+{% endblock %}
