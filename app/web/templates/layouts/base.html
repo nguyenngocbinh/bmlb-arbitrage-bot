@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}BMLB Arbitrage Lab{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body class="bmlb-app">
+<div class="app-shell">
+    {% include 'components/sidebar.html' %}
+    <div class="app-main">
+        {% include 'components/topbar.html' %}
+        <main class="page-content">
+            {% block content %}{% endblock %}
+        </main>
+        {% include 'components/footer.html' %}
+    </div>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>
