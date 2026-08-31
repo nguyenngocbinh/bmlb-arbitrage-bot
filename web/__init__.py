@@ -1,0 +1,1 @@
+"""Compatibility package. Dashboard moved to app/web.""

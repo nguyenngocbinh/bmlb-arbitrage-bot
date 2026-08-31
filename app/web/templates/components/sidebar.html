@@ -1,0 +1,37 @@
+<aside class="sidebar" aria-label="Primary navigation">
+    <a class="brand" href="/dashboard">
+        <span class="brand-mark">B</span>
+        <span><strong>BMLB</strong><small>ARBITRAGE LAB</small></span>
+    </a>
+
+    <nav class="side-nav">
+        <div class="nav-group"><div class="nav-label">Overview</div>
+            <a class="nav-item {% if request.path == '/dashboard' %}active{% endif %}" href="/dashboard"><span class="nav-icon">⌂</span><span>Dashboard</span></a>
+            <a class="nav-item" href="/dashboard#opportunities"><span class="nav-icon">⌁</span><span>Live Monitor</span></a>
+        </div>
+        <div class="nav-group"><div class="nav-label">Trading</div>
+            <a class="nav-item" href="/dashboard#opportunities"><span class="nav-icon">⇄</span><span>Arbitrage</span></a>
+            <a class="nav-item" href="/dashboard#opportunities"><span class="nav-icon">✦</span><span>Opportunities</span></a>
+            <a class="nav-item" href="/dashboard#trades"><span class="nav-icon">▤</span><span>Orders</span></a>
+        </div>
+        <div class="nav-group"><div class="nav-label">Research</div>
+            <a class="nav-item {% if request.path == '/backtest' %}active{% endif %}" href="/backtest"><span class="nav-icon">◷</span><span>Backtest</span></a>
+            <a class="nav-item" href="/dashboard#trades"><span class="nav-icon">◫</span><span>Sessions</span></a>
+            <a class="nav-item" href="/dashboard#performance"><span class="nav-icon">⌁</span><span>Performance</span></a>
+        </div>
+        <div class="nav-group"><div class="nav-label">Infrastructure</div>
+            <a class="nav-item" href="/dashboard#exchanges"><span class="nav-icon">◎</span><span>Exchanges</span></a>
+            <a class="nav-item" href="/dashboard#risk"><span class="nav-icon">△</span><span>Risk</span></a>
+            <a class="nav-item" href="/dashboard#system"><span class="nav-icon">≡</span><span>Logs</span></a>
+        </div>
+        <div class="nav-group"><div class="nav-label">Settings</div>
+            <a class="nav-item {% if request.path == '/settings' %}active{% endif %}" href="/settings"><span class="nav-icon">⚙</span><span>Bot Profile</span></a>
+            <a class="nav-item" href="/settings"><span class="nav-icon">◌</span><span>System Settings</span></a>
+        </div>
+    </nav>
+
+    <div class="sidebar-bottom">
+        <div class="sidebar-promo"><strong>BMLB Pro</strong><span>Advanced analytics & execution diagnostics.</span><a href="/backtest">Open research →</a></div>
+        <div class="sidebar-meta"><span>v2.0</span><span>UTC+7</span></div>
+    </div>
+</aside>

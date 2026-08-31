@@ -9,7 +9,8 @@ applyTo: "tests/**/*.py"
 
 - pytest + pytest-asyncio
 - Test files: `tests/test_*.py`
-- Import pattern: `from services.xxx import XxxService`
+- New production imports must use the `app.*` namespace.
+- Legacy `services.*`, `bots.*`, `utils.*`, `backtest.*` imports are compatibility paths only.
 
 ## Conventions
 
@@ -35,9 +36,9 @@ db = DatabaseService(db_path=':memory:')
 ## Chạy Tests
 
 ```bash
-pytest tests/ -v                    # Tất cả tests
-pytest tests/test_backtest.py -v    # Chỉ backtest
-pytest tests/ -v -x                 # Dừng khi gặp lỗi đầu tiên
-pytest tests/ -v -k "test_risk"     # Filter theo tên
-pytest tests/test_integration.py -q # Kiểm tra contract async giữa services
+pytest tests/ -v
+pytest tests/test_backtest.py -v
+pytest tests/ -v -x
+pytest tests/ -v -k "test_risk"
+pytest tests/test_integration.py -q
 ```

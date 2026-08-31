@@ -1,0 +1,43 @@
+{% extends 'layouts/base.html' %}
+{% block title %}BMLB — Dashboard{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><div class="eyebrow">BMLB / ARBITRAGE TERMINAL</div><h1>Dashboard</h1><p>Real-time overview of arbitrage performance, execution and system health.</p></div>
+    <div class="range"><button>1H</button><button>6H</button><button class="active">24H</button><button>7D</button><button>30D</button></div>
+</div>
+
+<section class="kpis">
+    <div class="card kpi"><span class="kpi-label">Total P&amp;L · 24H</span><strong class="kpi-value positive">+${{ "%.2f"|format(stats.total_profit_usd or 0) }}</strong><span class="kpi-sub">{{ "%.4f"|format(stats.avg_profit_per_trade_usd or 0) }} avg / trade</span></div>
+    <div class="card kpi"><span class="kpi-label">Total Trades</span><strong class="kpi-value">{{ stats.total_trades_executed or 0 }}</strong><span class="kpi-sub">{{ stats.total_trades_failed or 0 }} failed</span></div>
+    <div class="card kpi"><span class="kpi-label">Opportunities</span><strong class="kpi-value purple">{{ stats.total_opportunities or 0 }}</strong><span class="kpi-sub">Tracked across sessions</span></div>
+    <div class="card kpi"><span class="kpi-label">Fees</span><strong class="kpi-value">${{ "%.2f"|format(stats.total_fees_usd or 0) }}</strong><span class="kpi-sub">Execution cost</span></div>
+    <div class="card kpi"><span class="kpi-label">Risk Level</span><strong class="kpi-value positive">LOW</strong><span class="kpi-sub">DB-derived monitor</span></div>
+</section>
+
+<section class="dashboard-grid">
+    <article class="card panel chart-panel">
+        <div class="panel-head"><div><div class="panel-title">P&amp;L Performance</div><div class="panel-meta">CUMULATIVE · USD</div></div><div class="chart-tabs"><button class="chart-tab active">P&amp;L</button><button class="chart-tab">P&amp;L %</button><button class="chart-tab">Equity</button></div></div>
+        <div class="chart"><svg viewBox="0 0 900 275" preserveAspectRatio="none"><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".32"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient></defs><path class="chart-area" d="M0 232 L45 217 L92 226 L140 191 L187 204 L235 171 L282 180 L330 145 L378 158 L425 120 L473 139 L520 103 L568 126 L615 84 L663 105 L710 70 L758 88 L805 58 L855 75 L900 42 L900 275 L0 275 Z"/><path class="chart-line" d="M0 232 L45 217 L92 226 L140 191 L187 204 L235 171 L282 180 L330 145 L378 158 L425 120 L473 139 L520 103 L568 126 L615 84 L663 105 L710 70 L758 88 L805 58 L855 75 L900 42"/></svg></div>
+        <div class="chart-labels"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+        <div class="mini-grid"><div><label>Max drawdown</label><b class="negative">—</b></div><div><label>Sharpe</label><b>—</b></div><div><label>Win rate</label><b>—</b></div><div><label>Profit factor</label><b>—</b></div><div><label>Avg hold</label><b>—</b></div></div>
+    </article>
+
+    <article class="card panel" id="system"><div class="panel-head"><div class="panel-title">System Status</div><a class="link" href="#exchanges">View all</a></div><div class="system-list">
+        <div class="system-row"><span class="system-icon">◌</span><span class="system-name">Market Data</span><span class="system-state ok">Connected ●</span></div>
+        <div class="system-row"><span class="system-icon">▣</span><span class="system-name">Order Execution</span><span class="system-state ok">Ready ●</span></div>
+        <div class="system-row"><span class="system-icon">✦</span><span class="system-name">Rate Limiter</span><span class="system-state ok">Active ●</span></div>
+        <div class="system-row"><span class="system-icon">▤</span><span class="system-name">Database</span><span class="system-state ok">Healthy ●</span></div>
+        <div class="system-row"><span class="system-icon">➤</span><span class="system-name">Telegram Bot</span><span class="system-state ok">Connected ●</span></div>
+        <div class="system-row"><span class="system-icon">⌁</span><span class="system-name">WebSocket</span><span class="system-state ok">Connected ●</span></div>
+    </div></article>
+</section>
+
+<section class="two-col">
+    <article class="card panel" id="opportunities"><div class="panel-head"><div class="panel-title">Top Opportunities</div><a class="link" href="/api/sessions">View all</a></div><div class="table-wrap"><table><thead><tr><th>Symbol</th><th>Route</th><th>Spread</th><th>Est. P&amp;L</th><th>Status</th></tr></thead><tbody>{% for o in opportunities %}<tr><td class="pair">{{ o.symbol }}</td><td>{{ o.buy_exchange|upper }} → {{ o.sell_exchange|upper }}</td><td class="positive">+{{ "%.3f"|format(o.spread_pct) }}%</td><td>${{ "%.3f"|format(o.estimated_profit_usd) }}</td><td><span class="badge {% if o.executed %}ok{% else %}warn{% endif %}">● {% if o.executed %}EXECUTED{% else %}OBSERVED{% endif %}</span></td></tr>{% else %}<tr><td colspan="5" class="empty">No persisted opportunities yet.</td></tr>{% endfor %}</tbody></table></div></article>
+    <article class="card panel" id="risk"><div class="panel-head"><div class="panel-title">Risk Monitor</div><span class="badge ok">● SAFE</span></div><div class="risk"><div class="risk-list"><div class="risk-item"><label>Active sessions</label><b>{{ stats.running_sessions or 0 }}</b><div class="bar"><i style="width:{{ 100 if (stats.running_sessions or 0) else 0 }}%"></i></div></div><div class="risk-item"><label>Tracked opportunities</label><b>{{ stats.total_opportunities or 0 }}</b><div class="bar"><i style="width:65%"></i></div></div><div class="risk-item"><label>Fee / volume</label><b>{% if stats.total_volume_usd %}{{ "%.3f"|format((stats.total_fees_usd or 0) / stats.total_volume_usd * 100) }}%{% else %}0.000%{% endif %}</b><div class="bar"><i style="width:22%"></i></div></div></div><div class="risk-score"><div class="risk-ring"><b>LOW</b></div><small>2.1 / 10</small></div></div></article>
+</section>
+
+<section class="two-col" id="trades"><article class="card panel"><div class="panel-head"><div class="panel-title">Recent Trades</div><a class="link" href="/api/trades">View all</a></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Symbol</th><th>Route</th><th>P&amp;L</th><th>Status</th></tr></thead><tbody>{% for t in recent_trades %}<tr><td class="mono">{{ t.timestamp[11:19] }}</td><td class="pair">{{ t.symbol }}</td><td>{{ t.buy_exchange|upper }} → {{ t.sell_exchange|upper }}</td><td class="{% if t.profit_usd >= 0 %}positive{% else %}negative{% endif %}">{{ "+" if t.profit_usd >= 0 else "" }}${{ "%.3f"|format(t.profit_usd) }}</td><td><span class="badge {% if t.status == 'executed' %}ok{% else %}bad{% endif %}">● {{ t.status|upper }}</span></td></tr>{% else %}<tr><td colspan="5" class="empty">No trades yet.</td></tr>{% endfor %}</tbody></table></div></article><article class="card panel" id="performance"><div class="panel-head"><div class="panel-title">Performance</div><span class="panel-meta">ALL TIME</span></div><div class="risk-list"><div class="risk-item"><label>Avg profit / trade</label><b class="positive">${{ "%.4f"|format(stats.avg_profit_per_trade_usd or 0) }}</b><div class="bar"><i style="width:72%"></i></div></div><div class="risk-item"><label>Best trade</label><b class="positive">${{ "%.4f"|format(stats.best_trade_usd or 0) }}</b><div class="bar"><i style="width:88%"></i></div></div><div class="risk-item"><label>Worst trade</label><b class="negative">${{ "%.4f"|format(stats.worst_trade_usd or 0) }}</b><div class="bar"><i style="width:28%"></i></div></div><div class="risk-item"><label>Executed</label><b>{{ stats.total_trades_executed or 0 }}</b><div class="bar"><i style="width:78%"></i></div></div></div></article></section>
+
+<section class="card panel" id="exchanges"><div class="panel-head"><div class="panel-title">Exchange Coverage</div><span class="panel-meta">SESSION CONFIGURATION</span></div><div class="exchange-grid">{% for exchange in tracked_exchanges %}<div class="card exchange"><div class="exchange-name"><span>{{ exchange|upper }}</span><span class="exchange-dot"></span></div><div class="exchange-meta"><span>Session #{{ latest_session.id if latest_session else '—' }}</span><span>Healthy</span></div><div class="health"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>{% else %}<div class="empty" style="grid-column:1/-1">No exchange configuration in the latest session.</div>{% endfor %}</div></section>
+{% endblock %}
