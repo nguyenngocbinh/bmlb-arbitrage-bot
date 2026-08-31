@@ -37,6 +37,7 @@ from bots.fake_money_bot import FakeMoneyBot
 from utils.logger import log_info, log_error, log_warning, logger, safe_print, configure_console_encoding
 from utils.helpers import show_time
 from utils.session_recovery import SessionRecovery
+from utils.launch_profile import load_bot_profile
 from configs import PYTHON_COMMAND, ENABLE_TELEGRAM, BOT_MODES
 
 configure_console_encoding()
@@ -107,14 +108,14 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='BMLB Arbitrage Bot - Giao dịch chênh lệch giá crypto')
     
     # Tham số bắt buộc
-    parser.add_argument('mode', choices=BOT_MODES, help='Chế độ bot (fake-money, classic, delta-neutral)')
-    parser.add_argument('renew_time', type=int, help='Thời gian làm mới (phút)')
-    parser.add_argument('usdt_amount', type=float, help='Số lượng USDT để giao dịch')
+    parser.add_argument('mode', nargs='?', choices=BOT_MODES, help='Chế độ bot (fake-money, classic, delta-neutral)')
+    parser.add_argument('renew_time', nargs='?', type=int, help='Thời gian làm mới (phút)')
+    parser.add_argument('usdt_amount', nargs='?', type=float, help='Số lượng USDT để giao dịch')
     
     # Các sàn giao dịch
-    parser.add_argument('exchange1', help='Sàn giao dịch 1')
-    parser.add_argument('exchange2', help='Sàn giao dịch 2')
-    parser.add_argument('exchange3', help='Sàn giao dịch 3')
+    parser.add_argument('exchange1', nargs='?', help='Sàn giao dịch 1')
+    parser.add_argument('exchange2', nargs='?', help='Sàn giao dịch 2')
+    parser.add_argument('exchange3', nargs='?', help='Sàn giao dịch 3')
     
     # Tham số tùy chọn
     parser.add_argument('symbol', nargs='?', help='Cặp giao dịch (nếu bỏ trống sẽ tìm tự động)')
@@ -125,8 +126,15 @@ def parse_arguments():
     parser.add_argument('--dry-run', action='store_true', help='Chạy mà không thực hiện giao dịch thực tế')
     parser.add_argument('--no-recovery', action='store_true', help='Bỏ qua khôi phục phiên bị dừng')
     parser.add_argument('--symbols', nargs='+', help='Nhiều cặp giao dịch (vd: --symbols BTC/USDT ETH/USDT)')
+    parser.add_argument('--dashboard-config', action='store_true',
+                        help='Nạp profile đã lưu từ trang Settings')
     
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.dashboard_config and not all(
+            [args.mode, args.renew_time, args.usdt_amount, args.exchange1,
+             args.exchange2, args.exchange3]):
+        parser.error("Cần truyền mode, thời gian, vốn và đúng ba sàn hoặc dùng --dashboard-config")
+    return args
 
 
 def get_user_input():
@@ -393,14 +401,26 @@ async def main():
             if not args.no_banner:
                 display_banner()
             
-            mode = args.mode
-            renew_time = args.renew_time
-            usdt_amount = args.usdt_amount
-            exchanges = [args.exchange1, args.exchange2, args.exchange3]
-            symbol = args.symbol
-            dry_run = args.dry_run
-            no_recovery = args.no_recovery
-            symbols = args.symbols  # Multi-pair
+            if args.dashboard_config:
+                profile = load_bot_profile()
+                mode = profile['mode']
+                renew_time = profile['renew_time']
+                usdt_amount = profile['usdt_amount']
+                exchanges = profile['exchanges']
+                symbols = profile['symbols']
+                symbol = symbols[0] if len(symbols) == 1 else None
+                dry_run = profile['dry_run']
+                no_recovery = profile['no_recovery'] or args.no_recovery
+                log_info("Đã nạp profile cấu hình từ dashboard")
+            else:
+                mode = args.mode
+                renew_time = args.renew_time
+                usdt_amount = args.usdt_amount
+                exchanges = [args.exchange1, args.exchange2, args.exchange3]
+                symbol = args.symbol
+                dry_run = args.dry_run
+                no_recovery = args.no_recovery
+                symbols = args.symbols  # Multi-pair
             recovered_session_id = None
             
         # Nếu không có tham số dòng lệnh, lấy thông tin từ người dùng

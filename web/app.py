@@ -2,16 +2,46 @@
 FastAPI Web Dashboard cho BMLB Arbitrage Bot.
 Cung cấp API REST và giao diện web để theo dõi giao dịch.
 """
+import json
 from fastapi import FastAPI, Request, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import os
 from typing import Optional
+from pydantic import BaseModel, Field
 
+from backtest.analyzer import BacktestAnalyzer
+from backtest.data_recorder import DataRecorder
+from backtest.engine import BacktestEngine
 from services.database_service import DatabaseService
+from utils.launch_profile import load_bot_profile, save_bot_profile
 
 
-def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
+class BacktestRunRequest(BaseModel):
+    """Yêu cầu chạy backtest từ một phiên orderbook đã ghi."""
+
+    recording_session_id: int = Field(..., ge=1)
+    initial_balance_usd: float = Field(1000, gt=0, le=10000000)
+    profit_threshold_usd: float = Field(0, ge=0, le=1000000)
+    profit_threshold_pct: float = Field(0, ge=0, le=100)
+    slippage_bps: float = Field(0, ge=0, le=10000)
+    cooldown_seconds: float = Field(0, ge=0, le=86400)
+
+
+class BotProfileRequest(BaseModel):
+    """Profile cấu hình bot được lưu từ trang Settings."""
+
+    mode: str
+    renew_time: int = Field(..., ge=1)
+    usdt_amount: float = Field(..., gt=0)
+    exchanges: list[str]
+    symbols: list[str]
+    dry_run: bool = True
+    no_recovery: bool = True
+
+
+def create_app(db_service: Optional[DatabaseService] = None,
+               data_recorder: Optional[DataRecorder] = None) -> FastAPI:
     """Tạo FastAPI app."""
     app = FastAPI(
         title="BMLB Arbitrage Bot Dashboard",
@@ -22,6 +52,8 @@ def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
     templates_dir = os.path.join(os.path.dirname(__file__), 'templates')
     templates = Jinja2Templates(directory=templates_dir)
     db = db_service or DatabaseService()
+    recorder = data_recorder or DataRecorder()
+    backtest_engine = BacktestEngine(data_recorder=recorder)
 
     @app.get("/", response_class=HTMLResponse)
     async def landing(request: Request):
@@ -32,6 +64,21 @@ def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
     async def getting_started(request: Request):
         """Beginner guide with safe paper trading and dry-run workflow."""
         return templates.TemplateResponse(request, "getting_started.html", context={})
+
+    @app.get("/settings", response_class=HTMLResponse)
+    async def settings(request: Request):
+        """Hiển thị trang cấu hình profile khởi chạy bot."""
+        return templates.TemplateResponse(request, "settings.html", context={
+            "profile": load_bot_profile(),
+        })
+
+    @app.get("/backtest", response_class=HTMLResponse)
+    async def backtest(request: Request):
+        """Hiển thị workspace chạy và xem lại backtest."""
+        return templates.TemplateResponse(request, "backtest.html", context={
+            "recording_sessions": recorder.get_recording_sessions(),
+            "backtest_runs": recorder.get_backtest_runs(limit=20),
+        })
 
     @app.get("/dashboard", response_class=HTMLResponse)
     async def dashboard(request: Request):
@@ -177,6 +224,77 @@ def create_app(db_service: Optional[DatabaseService] = None) -> FastAPI:
         """Lấy danh sách lỗi."""
         errors = db.get_errors(session_id, error_type, limit)
         return {"success": True, "data": errors, "count": len(errors)}
+
+    @app.get("/api/settings/bot-profile")
+    async def get_bot_profile():
+        """Lấy profile khởi chạy bot đã lưu."""
+        return {"success": True, "data": load_bot_profile()}
+
+    @app.put("/api/settings/bot-profile")
+    async def update_bot_profile(profile: BotProfileRequest):
+        """Kiểm tra và lưu profile khởi chạy bot."""
+        try:
+            saved_profile = save_bot_profile(profile.model_dump())
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return {"success": True, "data": saved_profile}
+
+    @app.get("/api/backtest/sessions")
+    async def get_backtest_sessions():
+        """Lấy các phiên orderbook có thể dùng để backtest."""
+        sessions = recorder.get_recording_sessions()
+        return {"success": True, "data": sessions, "count": len(sessions)}
+
+    @app.post("/api/backtest/run")
+    async def run_backtest(request: BacktestRunRequest):
+        """Chạy và lưu một backtest từ dữ liệu orderbook đã ghi."""
+        recording_session = recorder.get_recording_session(request.recording_session_id)
+        if not recording_session:
+            raise HTTPException(status_code=404, detail="Phiên ghi dữ liệu không tồn tại")
+
+        exchanges = json.loads(recording_session['exchanges'])
+        if len(exchanges) < 2:
+            raise HTTPException(
+                status_code=422, detail="Backtest cần ít nhất hai sàn giao dịch"
+            )
+
+        result = backtest_engine.run(
+            symbol=recording_session['symbol'],
+            exchanges=exchanges,
+            initial_balance_usd=request.initial_balance_usd,
+            profit_threshold_usd=request.profit_threshold_usd,
+            profit_threshold_pct=request.profit_threshold_pct,
+            slippage_bps=request.slippage_bps,
+            cooldown_seconds=request.cooldown_seconds,
+            recording_session_id=request.recording_session_id,
+        )
+        if result.start_time is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Phiên ghi dữ liệu chưa có snapshot để chạy backtest",
+            )
+
+        analysis = BacktestAnalyzer.analyze(result)
+        run_id = recorder.save_backtest_result(
+            request.recording_session_id, result, analysis
+        )
+        saved_run = recorder.get_backtest_run(run_id)
+        return {"success": True, "data": saved_run}
+
+    @app.get("/api/backtest/results")
+    async def get_backtest_results(limit: int = Query(50, ge=1, le=500)):
+        """Lấy lịch sử kết quả backtest."""
+        runs = recorder.get_backtest_runs(limit)
+        return {"success": True, "data": runs, "count": len(runs)}
+
+    @app.get("/api/backtest/results/{run_id}")
+    async def get_backtest_result(run_id: int):
+        """Lấy chi tiết một kết quả backtest cùng giao dịch mô phỏng."""
+        run = recorder.get_backtest_run(run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Kết quả backtest không tồn tại")
+        run['trades'] = recorder.get_backtest_trades(run_id)
+        return {"success": True, "data": run}
 
     @app.get("/api/health")
     async def health_check():

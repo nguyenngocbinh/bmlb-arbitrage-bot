@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - BMLB Arbitrage Bot</title>
+    <style>
+        * { box-sizing:border-box; } :root { --bg:#0b0f14; --panel:#111821; --line:#263241; --text:#eef3f8; --muted:#9aa8b6; --accent:#21c7a8; --danger:#ff8585; }
+        body { margin:0; background:var(--bg); color:var(--text); font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; } a { color:inherit; text-decoration:none; }
+        .shell { max-width:980px; margin:auto; padding:0 24px 48px; } .topbar { background:#0d131a; border-bottom:1px solid var(--line); } .topbar .shell { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+        .brand { font-weight:800; letter-spacing:.06em; } .brand b { color:var(--accent); } nav { display:flex; gap:17px; color:var(--muted); } nav a:hover,nav .active { color:var(--accent); }
+        header { padding:40px 0 24px; } .eyebrow { color:var(--accent); font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; } h1 { margin:8px 0; font-size:32px; } .lead { margin:0; color:var(--muted); line-height:1.5; }
+        .grid { display:grid; grid-template-columns:1fr 300px; gap:18px; } .card { padding:21px; border:1px solid var(--line); border-radius:10px; background:var(--panel); } h2 { margin:0 0 16px; font-size:17px; } h3 { margin:0 0 8px; font-size:14px; } label { display:block; margin:14px 0 6px; color:var(--muted); font-size:12px; }
+        input,select,textarea { width:100%; padding:10px; color:var(--text); background:#0c1219; border:1px solid var(--line); border-radius:6px; font:inherit; } textarea { min-height:76px; resize:vertical; } .selects { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; } .check { display:flex; align-items:center; gap:9px; margin-top:15px; color:#cbd5df; } .check input { width:auto; }
+        button { width:100%; margin-top:20px; padding:11px; border:0; border-radius:6px; background:var(--accent); color:#06231d; font-weight:800; cursor:pointer; } button:disabled { opacity:.65; cursor:wait; } .message { min-height:21px; margin-top:11px; color:var(--accent); } .message.error { color:var(--danger); }
+        .notice { color:#b9e6dd; border:1px solid #2f5b57; background:#10201e; border-radius:8px; padding:13px; margin-bottom:16px; line-height:1.45; } .side p { color:var(--muted); line-height:1.5; margin:0 0 16px; } code { display:block; overflow-wrap:anywhere; padding:10px; background:#080d12; border:1px solid var(--line); border-radius:6px; color:#c7f4eb; font:12px Consolas,"Liberation Mono",monospace; }
+        @media (max-width:760px) { .grid { grid-template-columns:1fr; } .selects { grid-template-columns:1fr; } .topbar .shell { align-items:flex-start; padding-top:16px; padding-bottom:16px; } }
+    </style>
+</head>
+<body>
+    <div class="topbar"><div class="shell"><a class="brand" href="/"><b>BMLB</b> ARBITRAGE LAB</a><nav><a href="/dashboard">Dashboard</a><a href="/backtest">Backtest</a><a class="active" href="/settings">Settings</a><a href="/docs">API Docs</a></nav></div></div>
+    <main class="shell">
+        <header><div class="eyebrow">Bot launch profile</div><h1>Bot Configuration</h1><p class="lead">Lưu cấu hình cho lần chạy bot tiếp theo. Trang này không khởi chạy bot và không lưu API key.</p></header>
+        <div class="grid">
+            <section class="card">
+                <h2>Trading setup</h2>
+                <form id="profile-form">
+                    <label for="mode">Bot mode</label>
+                    <select id="mode"><option value="fake-money">Fake money</option><option value="classic">Classic</option><option value="delta-neutral">Delta-neutral</option></select>
+                    <label for="renew-time">Thời gian mỗi phiên (phút)</label><input id="renew-time" type="number" min="1" value="{{ profile.renew_time }}" required>
+                    <label for="amount">Vốn mỗi bot (USDT)</label><input id="amount" type="number" min="0.01" step="0.01" value="{{ profile.usdt_amount }}" required>
+                    <label>Ba sàn giao dịch</label>
+                    <div class="selects">
+                        {% for current_exchange in profile.exchanges %}
+                        <select class="exchange">
+                            {% for exchange in ['binance', 'kucoin', 'okx', 'bybit', 'kucoinfutures'] %}
+                            <option value="{{ exchange }}" {% if exchange == current_exchange %}selected{% endif %}>{{ exchange|upper }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endfor %}
+                    </div>
+                    <label for="symbols">Trading pairs (mỗi dòng hoặc phân tách bằng dấu phẩy)</label><textarea id="symbols" required>{{ profile.symbols|join(', ') }}</textarea>
+                    <label class="check"><input id="dry-run" type="checkbox" {% if profile.dry_run %}checked{% endif %}> Luôn chạy dry-run (không đặt lệnh thật)</label>
+                    <label class="check"><input id="no-recovery" type="checkbox" {% if profile.no_recovery %}checked{% endif %}> Bỏ qua recovery prompt</label>
+                    <button id="save-button" type="submit">Save launch profile</button><div class="message" id="message"></div>
+                </form>
+            </section>
+            <aside class="side">
+                <div class="notice"><strong>An toàn:</strong> API key chỉ cấu hình trong <code>.env</code>, không được nhập vào dashboard.</div>
+                <div class="card"><h3>Chạy profile đã lưu</h3><p>Sau khi lưu, dùng lệnh sau từ thư mục dự án:</p><code>python main.py --dashboard-config</code></div>
+                <div class="card" style="margin-top:18px"><h3>Sandbox / testnet</h3><p>Đặt <code>USE_SANDBOX=true</code> và các biến <code>*_TESTNET_*</code> trong <code>.env</code>. Restart bot sau khi sửa file môi trường.</p></div>
+            </aside>
+        </div>
+    </main>
+    <script>
+        document.getElementById('mode').value = '{{ profile.mode }}';
+        const form = document.getElementById('profile-form');
+        const message = document.getElementById('message');
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const symbols = document.getElementById('symbols').value.split(/[\n,]+/).map(value => value.trim()).filter(Boolean);
+            const profile = {
+                mode: document.getElementById('mode').value,
+                renew_time: Number(document.getElementById('renew-time').value),
+                usdt_amount: Number(document.getElementById('amount').value),
+                exchanges: [...document.querySelectorAll('.exchange')].map(select => select.value),
+                symbols,
+                dry_run: document.getElementById('dry-run').checked,
+                no_recovery: document.getElementById('no-recovery').checked
+            };
+            const button = document.getElementById('save-button');
+            button.disabled = true; message.className = 'message'; message.textContent = '';
+            const response = await fetch('/api/settings/bot-profile', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(profile) });
+            const payload = await response.json(); button.disabled = false;
+            if (!response.ok) { message.className = 'message error'; message.textContent = payload.detail || 'Không thể lưu profile.'; return; }
+            message.textContent = 'Đã lưu. Chạy: python main.py --dashboard-config';
+        });
+    </script>
+</body>
+</html>
