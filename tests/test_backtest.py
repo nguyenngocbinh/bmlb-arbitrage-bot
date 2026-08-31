@@ -127,6 +127,28 @@ class TestDataRecorder:
         assert sessions[0]['status'] == 'completed'
         assert sessions[0]['snapshot_count'] == 100
 
+    def test_get_snapshots_filters_recording_session(self, recorder):
+        first_session = recorder.start_recording_session(
+            'BTC/USDT', ['binance', 'kucoin']
+        )
+        second_session = recorder.start_recording_session(
+            'BTC/USDT', ['binance', 'kucoin']
+        )
+        recorder.record_snapshot(
+            time.time(), 'BTC/USDT', 'binance', 50000, 50001,
+            recording_session_id=first_session
+        )
+        recorder.record_snapshot(
+            time.time(), 'BTC/USDT', 'binance', 51000, 51001,
+            recording_session_id=second_session
+        )
+
+        snapshots = recorder.get_snapshots(
+            'BTC/USDT', recording_session_id=first_session
+        )
+        assert len(snapshots) == 1
+        assert snapshots[0]['best_bid'] == 50000
+
     def test_generate_synthetic_data(self, recorder):
         count = recorder.generate_synthetic_data(
             'BTC/USDT', ['binance', 'kucoin'],

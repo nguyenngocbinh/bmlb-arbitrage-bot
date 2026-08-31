@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backtest - BMLB Arbitrage Bot</title>
+    <style>
+        * { box-sizing: border-box; }
+        :root { --bg:#0b0f14; --panel:#111821; --line:#263241; --text:#eef3f8; --muted:#9aa8b6; --accent:#21c7a8; --danger:#ff7b7b; }
+        body { margin:0; background:var(--bg); color:var(--text); font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; }
+        a { color:inherit; text-decoration:none; }
+        .shell { max-width:1180px; margin:auto; padding:0 24px 48px; }
+        .topbar { border-bottom:1px solid var(--line); background:#0d131a; }
+        .topbar .shell { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+        .brand { font-weight:800; letter-spacing:.06em; } .brand b { color:var(--accent); }
+        nav { display:flex; gap:18px; color:var(--muted); } nav a:hover, nav .active { color:var(--accent); }
+        header { padding:42px 0 24px; } .eyebrow { color:var(--accent); font-size:12px; font-weight:700; letter-spacing:.13em; text-transform:uppercase; }
+        h1 { margin:8px 0; font-size:32px; } .lead { color:var(--muted); margin:0; max-width:720px; line-height:1.5; }
+        .notice { border:1px solid #2f5b57; background:#10201e; color:#b9e6dd; padding:12px 14px; border-radius:8px; margin:18px 0; }
+        .grid { display:grid; grid-template-columns:370px 1fr; gap:18px; }
+        .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; }
+        h2 { margin:0 0 16px; font-size:17px; } label { display:block; color:var(--muted); margin:13px 0 6px; font-size:12px; }
+        select, input { width:100%; padding:10px; background:#0c1219; border:1px solid var(--line); border-radius:6px; color:var(--text); }
+        button { margin-top:18px; width:100%; border:0; border-radius:6px; padding:11px; font-weight:700; background:var(--accent); color:#06231d; cursor:pointer; }
+        button:disabled { opacity:.6; cursor:wait; } .error { color:var(--danger); min-height:20px; margin-top:10px; }
+        table { width:100%; border-collapse:collapse; } th,td { padding:11px 8px; border-bottom:1px solid var(--line); text-align:left; } th { color:var(--muted); font-size:11px; text-transform:uppercase; } .empty { color:var(--muted); text-align:center; padding:28px; }
+        .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:16px 0; } .kpi { border:1px solid var(--line); border-radius:7px; padding:12px; } .kpi label { margin:0; } .kpi strong { display:block; margin-top:7px; font-size:19px; color:var(--accent); }
+        .run-link { color:var(--accent); cursor:pointer; } .hidden { display:none; } .detail { margin-top:16px; }
+        @media (max-width:800px) { .grid { grid-template-columns:1fr; } .kpis { grid-template-columns:repeat(2,1fr); } .topbar .shell { align-items:flex-start; padding-top:16px; padding-bottom:16px; } }
+    </style>
+</head>
+<body>
+    <div class="topbar"><div class="shell"><a class="brand" href="/"><b>BMLB</b> ARBITRAGE LAB</a><nav><a href="/dashboard">Dashboard</a><a class="active" href="/backtest">Backtest</a><a href="/settings">Settings</a><a href="/docs">API Docs</a></nav></div></div>
+    <main class="shell">
+        <header><div class="eyebrow">Simulation workspace</div><h1>Backtest Arbitrage</h1><p class="lead">Chạy mô phỏng từ orderbook đã ghi. Kết quả và simulated trades được lưu riêng, không ảnh hưởng đến analytics giao dịch bot.</p></header>
+        <div class="notice">Tất cả chỉ số trên trang này là dữ liệu mô phỏng (SIMULATED / BACKTEST).</div>
+        <div class="grid">
+            <section class="card"><h2>Run backtest</h2>
+                <form id="run-form">
+                    <label for="recording-session">Recording session</label>
+                    <select id="recording-session" required>
+                        <option value="">Chọn phiên dữ liệu</option>
+                        {% for session in recording_sessions %}
+                        <option value="{{ session.id }}">{{ session.symbol }} · {{ session.exchanges }} · {{ session.snapshot_count }} snapshots · {{ session.status }}</option>
+                        {% endfor %}
+                    </select>
+                    <label for="balance">Vốn ban đầu (USDT)</label><input id="balance" type="number" min="0.01" value="1000" required>
+                    <label for="profit-usd">Ngưỡng lợi nhuận (USDT)</label><input id="profit-usd" type="number" min="0" value="0" required>
+                    <label for="profit-pct">Ngưỡng spread (%)</label><input id="profit-pct" type="number" min="0" value="0" required>
+                    <label for="slippage">Slippage (bps)</label><input id="slippage" type="number" min="0" value="0" required>
+                    <label for="cooldown">Cooldown (giây)</label><input id="cooldown" type="number" min="0" value="0" required>
+                    <button id="run-button" type="submit">Run Backtest</button><div class="error" id="error"></div>
+                </form>
+            </section>
+            <section class="card"><h2>Saved backtest runs</h2>
+                <table><thead><tr><th>Run</th><th>Symbol</th><th>Trades</th><th>P&amp;L</th><th>Win rate</th><th>Created</th></tr></thead>
+                    <tbody id="runs">
+                    {% for run in backtest_runs %}
+                    <tr data-run-id="{{ run.id }}"><td><span class="run-link">#{{ run.id }}</span></td><td>{{ run.symbol }}</td><td>{{ run.analysis.total_trades }}</td><td>${{ "%.4f"|format(run.analysis.total_profit_usd) }}</td><td>{{ "%.2f"|format(run.analysis.win_rate) }}%</td><td>{{ run.created_at }}</td></tr>
+                    {% else %}<tr><td class="empty" colspan="6">Chưa có kết quả backtest được lưu.</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+                <div class="detail hidden" id="detail"><h2>Run <span id="run-id"></span> · SIMULATED</h2><div class="kpis" id="kpis"></div>
+                    <table><thead><tr><th>#</th><th>Buy</th><th>Sell</th><th>Amount</th><th>P&amp;L</th><th>Fee</th></tr></thead><tbody id="trades"></tbody></table>
+                </div>
+            </section>
+        </div>
+    </main>
+    <script>
+        const number = (id) => Number(document.getElementById(id).value);
+        const error = document.getElementById('error');
+        const detail = document.getElementById('detail');
+        async function showRun(runId) {
+            const response = await fetch(`/api/backtest/results/${runId}`);
+            const payload = await response.json();
+            if (!response.ok) { error.textContent = payload.detail || 'Không thể tải kết quả.'; return; }
+            const run = payload.data, a = run.analysis;
+            document.getElementById('run-id').textContent = `#${run.id}`;
+            document.getElementById('kpis').innerHTML = [
+                ['Total P&L', `$${a.total_profit_usd.toFixed(4)}`], ['Trades', a.total_trades],
+                ['Win rate', `${a.win_rate.toFixed(2)}%`], ['Max drawdown', `${a.max_drawdown_pct.toFixed(2)}%`]
+            ].map(([label, value]) => `<div class="kpi"><label>${label}</label><strong>${value}</strong></div>`).join('');
+            document.getElementById('trades').innerHTML = run.trades.length ? run.trades.map(t => `<tr><td>${t.trade_number}</td><td>${t.buy_exchange}</td><td>${t.sell_exchange}</td><td>${t.amount}</td><td>$${t.profit_usd.toFixed(4)}</td><td>$${t.fee_usd.toFixed(4)}</td></tr>`).join('') : '<tr><td class="empty" colspan="6">Không có giao dịch mô phỏng.</td></tr>';
+            detail.classList.remove('hidden');
+        }
+        document.getElementById('run-form').addEventListener('submit', async (event) => {
+            event.preventDefault(); error.textContent = '';
+            const button = document.getElementById('run-button'); button.disabled = true; button.textContent = 'Đang chạy...';
+            const response = await fetch('/api/backtest/run', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+                recording_session_id: number('recording-session'), initial_balance_usd: number('balance'),
+                profit_threshold_usd: number('profit-usd'), profit_threshold_pct: number('profit-pct'),
+                slippage_bps: number('slippage'), cooldown_seconds: number('cooldown')
+            })});
+            const payload = await response.json(); button.disabled = false; button.textContent = 'Run Backtest';
+            if (!response.ok) { error.textContent = payload.detail || 'Không thể chạy backtest.'; return; }
+            window.location.reload();
+        });
+        document.getElementById('runs').addEventListener('click', (event) => {
+            const row = event.target.closest('tr[data-run-id]');
+            if (row) { showRun(row.dataset.runId); }
+        });
+    </script>
+</body>
+</html>

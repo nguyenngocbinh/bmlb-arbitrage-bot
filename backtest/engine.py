@@ -148,7 +148,8 @@ class BacktestEngine:
 
     def run(self, symbol: str, exchanges: list[str], initial_balance_usd: float = 1000,
             fee_config=None, profit_threshold_usd=None, profit_threshold_pct=None,
-            slippage_bps=0, cooldown_seconds=0, start_time=None, end_time=None):
+            slippage_bps=0, cooldown_seconds=0, start_time=None, end_time=None,
+            recording_session_id: Optional[int] = None) -> BacktestResult:
         """
         Chạy backtest.
 
@@ -173,7 +174,7 @@ class BacktestEngine:
 
         # Lấy dữ liệu
         snapshots = self.data_recorder.get_snapshots(
-            symbol, exchanges, start_time, end_time
+            symbol, exchanges, start_time, end_time, recording_session_id
         )
 
         if not snapshots:

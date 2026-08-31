@@ -86,10 +86,53 @@ class DataRecorder:
                     status TEXT DEFAULT 'recording'
                 )
             """)
+            columns = {
+                row['name'] for row in conn.execute(
+                    "PRAGMA table_info(orderbook_snapshots)"
+                ).fetchall()
+            }
+            if 'recording_session_id' not in columns:
+                conn.execute(
+                    "ALTER TABLE orderbook_snapshots ADD COLUMN recording_session_id INTEGER"
+                )
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ob_recording_session
+                ON orderbook_snapshots(recording_session_id, timestamp)
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS backtest_runs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    recording_session_id INTEGER NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    config TEXT NOT NULL,
+                    analysis TEXT NOT NULL,
+                    equity_curve TEXT NOT NULL,
+                    FOREIGN KEY (recording_session_id) REFERENCES recording_sessions(id)
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS backtest_trades (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    backtest_run_id INTEGER NOT NULL,
+                    trade_number INTEGER NOT NULL,
+                    timestamp REAL NOT NULL,
+                    buy_exchange TEXT NOT NULL,
+                    sell_exchange TEXT NOT NULL,
+                    buy_price REAL NOT NULL,
+                    sell_price REAL NOT NULL,
+                    amount REAL NOT NULL,
+                    profit_usd REAL NOT NULL,
+                    profit_pct REAL NOT NULL,
+                    fee_usd REAL NOT NULL,
+                    cumulative_profit_usd REAL NOT NULL,
+                    FOREIGN KEY (backtest_run_id) REFERENCES backtest_runs(id)
+                )
+            """)
 
     def record_snapshot(self, timestamp: float, symbol: str, exchange: str, best_bid: float,
                         best_ask: float, bid_volume: Optional[float] = None,
-                        ask_volume: Optional[float] = None) -> None:
+                        ask_volume: Optional[float] = None,
+                        recording_session_id: Optional[int] = None) -> None:
         """
         Ghi một snapshot orderbook.
 
@@ -105,9 +148,11 @@ class DataRecorder:
         with self._get_connection() as conn:
             conn.execute("""
                 INSERT INTO orderbook_snapshots
-                (timestamp, symbol, exchange, best_bid, best_ask, bid_volume, ask_volume)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (timestamp, symbol, exchange, best_bid, best_ask, bid_volume, ask_volume))
+                (timestamp, symbol, exchange, best_bid, best_ask, bid_volume, ask_volume,
+                 recording_session_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (timestamp, symbol, exchange, best_bid, best_ask, bid_volume, ask_volume,
+                  recording_session_id))
 
     def record_batch(self, snapshots: list[dict[str, Any]]) -> None:
         """
@@ -119,12 +164,14 @@ class DataRecorder:
         with self._get_connection() as conn:
             conn.executemany("""
                 INSERT INTO orderbook_snapshots
-                (timestamp, symbol, exchange, best_bid, best_ask, bid_volume, ask_volume)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (timestamp, symbol, exchange, best_bid, best_ask, bid_volume, ask_volume,
+                 recording_session_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, [
                 (s['timestamp'], s['symbol'], s['exchange'],
                  s['best_bid'], s['best_ask'],
-                 s.get('bid_volume'), s.get('ask_volume'))
+                 s.get('bid_volume'), s.get('ask_volume'),
+                 s.get('recording_session_id'))
                 for s in snapshots
             ])
 
@@ -162,7 +209,8 @@ class DataRecorder:
             """, (datetime.now().isoformat(), snapshot_count, session_id))
 
     def get_snapshots(self, symbol: str, exchanges: Optional[list[str]] = None,
-                      start_time: Optional[float] = None, end_time: Optional[float] = None) -> list[dict[str, Any]]:
+                      start_time: Optional[float] = None, end_time: Optional[float] = None,
+                      recording_session_id: Optional[int] = None) -> list[dict[str, Any]]:
         """
         Lấy dữ liệu snapshot theo điều kiện.
 
@@ -191,6 +239,10 @@ class DataRecorder:
             query += " AND timestamp <= ?"
             params.append(end_time)
 
+        if recording_session_id is not None:
+            query += " AND recording_session_id = ?"
+            params.append(recording_session_id)
+
         query += " ORDER BY timestamp ASC"
 
         with self._get_connection() as conn:
@@ -209,6 +261,92 @@ class DataRecorder:
                 "SELECT * FROM recording_sessions ORDER BY id DESC"
             ).fetchall()
             return [dict(row) for row in rows]
+
+    def get_recording_session(self, session_id: int) -> Optional[dict[str, Any]]:
+        """Lấy thông tin một phiên ghi dữ liệu."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM recording_sessions WHERE id = ?", (session_id,)
+            ).fetchone()
+            return dict(row) if row else None
+
+    def save_backtest_result(self, recording_session_id: int, result: Any,
+                             analysis: dict[str, Any]) -> int:
+        """Lưu kết quả một lần chạy backtest và các giao dịch mô phỏng."""
+        with self._get_connection() as conn:
+            cursor = conn.execute("""
+                INSERT INTO backtest_runs
+                (recording_session_id, config, analysis, equity_curve)
+                VALUES (?, ?, ?, ?)
+            """, (
+                recording_session_id,
+                json.dumps(result.config),
+                json.dumps(analysis),
+                json.dumps(result.equity_curve),
+            ))
+            run_id = cursor.lastrowid
+            conn.executemany("""
+                INSERT INTO backtest_trades
+                (backtest_run_id, trade_number, timestamp, buy_exchange, sell_exchange,
+                 buy_price, sell_price, amount, profit_usd, profit_pct, fee_usd,
+                 cumulative_profit_usd)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [
+                (
+                    run_id, trade['trade_number'], trade['timestamp'],
+                    trade['buy_exchange'], trade['sell_exchange'], trade['buy_price'],
+                    trade['sell_price'], trade['amount'], trade['profit_usd'],
+                    trade['profit_pct'], trade['fee_usd'],
+                    trade['cumulative_profit_usd'],
+                )
+                for trade in result.trades
+            ])
+            return run_id
+
+    def get_backtest_runs(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Lấy lịch sử các lần chạy backtest mới nhất."""
+        with self._get_connection() as conn:
+            rows = conn.execute("""
+                SELECT br.id, br.recording_session_id, br.created_at, br.config,
+                       br.analysis, br.equity_curve, rs.symbol, rs.exchanges
+                FROM backtest_runs br
+                JOIN recording_sessions rs ON rs.id = br.recording_session_id
+                ORDER BY br.id DESC
+                LIMIT ?
+            """, (limit,)).fetchall()
+            return [self._deserialize_backtest_run(dict(row)) for row in rows]
+
+    def get_backtest_run(self, run_id: int) -> Optional[dict[str, Any]]:
+        """Lấy chi tiết một lần chạy backtest."""
+        with self._get_connection() as conn:
+            row = conn.execute("""
+                SELECT br.id, br.recording_session_id, br.created_at, br.config,
+                       br.analysis, br.equity_curve, rs.symbol, rs.exchanges
+                FROM backtest_runs br
+                JOIN recording_sessions rs ON rs.id = br.recording_session_id
+                WHERE br.id = ?
+            """, (run_id,)).fetchone()
+            return self._deserialize_backtest_run(dict(row)) if row else None
+
+    def get_backtest_trades(self, run_id: int, limit: int = 500) -> list[dict[str, Any]]:
+        """Lấy giao dịch mô phỏng của một lần chạy backtest."""
+        with self._get_connection() as conn:
+            rows = conn.execute("""
+                SELECT * FROM backtest_trades
+                WHERE backtest_run_id = ?
+                ORDER BY trade_number ASC
+                LIMIT ?
+            """, (run_id, limit)).fetchall()
+            return [dict(row) for row in rows]
+
+    @staticmethod
+    def _deserialize_backtest_run(run: dict[str, Any]) -> dict[str, Any]:
+        """Chuyển các trường JSON của backtest run thành dữ liệu có cấu trúc."""
+        run['config'] = json.loads(run['config'])
+        run['analysis'] = json.loads(run['analysis'])
+        run['equity_curve'] = json.loads(run['equity_curve'])
+        run['exchanges'] = json.loads(run['exchanges'])
+        return run
 
     def get_snapshot_count(self, symbol: Optional[str] = None) -> int:
         """
